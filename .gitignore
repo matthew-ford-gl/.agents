@@ -1,0 +1,10 @@
+# IGNORE EVERYTHING
+*
+
+# EXCEPT THESE FILES AND FOLDERS
+!.gitignore
+!/*.ps1
+!skills/
+!skills/**
+!agents/
+!agents/**
