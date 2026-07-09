@@ -10,8 +10,8 @@ $skills = @(
 )
 
 $agentsSkillsRoot = "C:\Users\Matthew.Ford\.agents\skills"
-$claudeSkillsRoot = ".\.claude\skills"
-$devinAppDataRoot = "$env:APPDATA\devin\skills"
+$claudeRoot = "C:\Users\Matthew.Ford\.claude\skills"
+$devinRoot = "C:\Users\Matthew.Ford\AppData\Roaming\devin\skills"
 
 foreach ($name in $skills) {
     $target = Join-Path $agentsSkillsRoot $name

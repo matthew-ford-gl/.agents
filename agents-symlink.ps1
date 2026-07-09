@@ -6,36 +6,31 @@ $agents = @(
     "observability-reviewer","performance-reviewer"
 )
 
-$canonicalRoot = "C:\Users\Matthew.Ford\.agents\agents"   # flat .md files live here
-$claudeRoot = ".\.claude\agents"
-$devinRoot = "$env:APPDATA\devin\agents"
+$canonicalRoot = "C:\Users\Matthew.Ford\.agents\agents"
+$claudeRoot = "C:\Users\Matthew.Ford\.claude\agents"
+$devinRoot = "C:\Users\Matthew.Ford\AppData\Roaming\devin\agents"
 
-New-Item -ItemType Directory -Force -Path $canonicalRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $claudeRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $devinRoot | Out-Null
 
 foreach ($name in $agents) {
-    $canonicalFile = Join-Path $canonicalRoot "$name.md"
-    $existingClaudeFile = Join-Path $claudeRoot "$name.md"
-    $existingDevinFile = Join-Path $devinRoot "$name\AGENT.md"
-
-    # Move the current Claude copy to canonical, first time only
-    if ((Test-Path $existingClaudeFile) -and -not (Test-Path $canonicalFile)) {
-        Move-Item $existingClaudeFile $canonicalFile
-    }
+    $canonicalFolder = Join-Path $canonicalRoot $name
+    $canonicalFile = Join-Path $canonicalFolder "AGENT.md"
 
     if (-not (Test-Path $canonicalFile)) {
-        Write-Host "SKIP $name — no source file found" -ForegroundColor Yellow
+        Write-Host "SKIP $name — no AGENT.md at $canonicalFile" -ForegroundColor Yellow
         continue
     }
 
-    # Claude: flat symlink
-    if (Test-Path $existingClaudeFile) { Remove-Item $existingClaudeFile -Force }
-    New-Item -ItemType SymbolicLink -Path $existingClaudeFile -Target $canonicalFile | Out-Null
+    # Claude: flat file symlink pointing at the canonical AGENT.md
+    $claudeFile = Join-Path $claudeRoot "$name.md"
+    if (Test-Path $claudeFile) { Remove-Item $claudeFile -Force }
+    New-Item -ItemType SymbolicLink -Path $claudeFile -Target $canonicalFile | Out-Null
 
-    # Devin: needs its own folder, then a file symlink named AGENT.md inside it
+    # Devin: whole-folder symlink, same shape as canonical already
     $devinFolder = Join-Path $devinRoot $name
-    New-Item -ItemType Directory -Force -Path $devinFolder | Out-Null
-    if (Test-Path $existingDevinFile) { Remove-Item $existingDevinFile -Force }
-    New-Item -ItemType SymbolicLink -Path $existingDevinFile -Target $canonicalFile | Out-Null
+    if (Test-Path $devinFolder) { Remove-Item $devinFolder -Recurse -Force }
+    New-Item -ItemType SymbolicLink -Path $devinFolder -Target $canonicalFolder | Out-Null
 
     Write-Host "Linked: $name"
 }
