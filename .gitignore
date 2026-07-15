@@ -3,6 +3,7 @@
 
 # EXCEPT THESE FILES AND FOLDERS
 !.gitignore
+!/*.md
 !/*.ps1
 !skills/
 !skills/**
