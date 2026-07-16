@@ -40,7 +40,9 @@ Diff-stage reviewers (run against the actual diff after tests pass):
 
 ## Path resolution
 
-For each agent, check Test-Path ".claude/agents/<name>.md". If true use that file, else use "~/.claude/agents/<name>.md".
+For each agent, resolve its file by checking, in order, and using the first that exists:
+`.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
+`~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`.
 
 ## Loop safety
 

@@ -44,7 +44,9 @@ strategic decision has already been debated and accepted by the human. In this c
 All other steps (4 onwards) run as normal.
 
 ## Path resolution
-For each agent, check Test-Path ".claude/agents/<name>.md". If true use that file, else use "~/.claude/agents/<name>.md".
+For each agent, resolve its file by checking, in order, and using the first that exists:
+`.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
+`~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`.
 
 ## Steps
 
