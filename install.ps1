@@ -19,13 +19,12 @@ function Remove-Safe {
     if (-not (Test-Path $Path)) { return }
 
     $item = Get-Item -LiteralPath $Path
-    if ($item.LinkType) {
-        # SymbolicLink, Junction, or HardLink — delete the reparse point/link, not the target.
-        $item.Delete()
-    } elseif ($item.PSIsContainer) {
-        Remove-Item -LiteralPath $Path -Recurse -Force
+    if ($item.PSIsContainer) {
+        # .NET Directory.Delete removes a directory reparse point (symlink/junction)
+        # without recursing into the target. For real directories it recurses.
+        [System.IO.Directory]::Delete($Path, $true)
     } else {
-        Remove-Item -LiteralPath $Path -Force
+        [System.IO.File]::Delete($Path)
     }
 }
 
@@ -119,3 +118,81 @@ if (-not (Test-Path $devinRoot)) {
 
 Install-Agents
 Install-Skills
+
+function Test-Link {
+    param([string]$Path, [string]$ExpectedTarget)
+    if (-not (Test-Path $Path)) {
+        return "$Path is missing"
+    }
+    $item = Get-Item -LiteralPath $Path
+    if (-not $item.Target) {
+        return "$Path is not a symlink/junction"
+    }
+    $actual = $item.Target | Select-Object -First 1
+    if ($actual -ne $ExpectedTarget) {
+        return "$Path points to $actual, expected $ExpectedTarget"
+    }
+    return $null
+}
+
+function Test-NoStaleDevin {
+    param([string]$Path, [string]$Name)
+    if (Test-Path $Path) {
+        return "Stale Devin copy remains: $Name at $Path"
+    }
+    return $null
+}
+
+function Test-Install {
+    $failures = [System.Collections.Generic.List[string]]::new()
+
+    # Verify Claude agent symlinks
+    if (Test-Path $canonicalAgentsRoot -PathType Container) {
+        $claudeAgentsDir = Join-Path $claudeRoot 'agents'
+        foreach ($agentDir in Get-ChildItem -Directory -Path $canonicalAgentsRoot | Sort-Object Name) {
+            $name = $agentDir.Name
+            $sourceFile = Join-Path $agentDir.FullName 'AGENT.md'
+            $claudeFile = Join-Path $claudeAgentsDir "$name.md"
+
+            if (Test-Path $claudeRoot) {
+                $failure = Test-Link -Path $claudeFile -ExpectedTarget $sourceFile
+                if ($failure) { $failures.Add($failure) }
+            }
+
+            if (Test-Path $devinRoot) {
+                $devinFolder = Join-Path $devinRoot "agents\$name"
+                $failure = Test-NoStaleDevin -Path $devinFolder -Name $name
+                if ($failure) { $failures.Add($failure) }
+            }
+        }
+    }
+
+    # Verify Claude skill symlinks
+    if (Test-Path $canonicalSkillsRoot -PathType Container) {
+        $claudeSkillsDir = Join-Path $claudeRoot 'skills'
+        foreach ($skillDir in Get-ChildItem -Directory -Path $canonicalSkillsRoot | Sort-Object Name) {
+            $name = $skillDir.Name
+            $sourceFolder = $skillDir.FullName
+            $claudeLink = Join-Path $claudeSkillsDir $name
+
+            if (Test-Path $claudeRoot) {
+                $failure = Test-Link -Path $claudeLink -ExpectedTarget $sourceFolder
+                if ($failure) { $failures.Add($failure) }
+            }
+
+            if (Test-Path $devinRoot) {
+                $devinDupe = Join-Path $devinRoot "skills\$name"
+                $failure = Test-NoStaleDevin -Path $devinDupe -Name $name
+                if ($failure) { $failures.Add($failure) }
+            }
+        }
+    }
+
+    if ($failures.Count -gt 0) {
+        throw "Install verification failed:`n$($failures -join "`n")"
+    }
+
+    Write-Host "Install verified: all Claude links are correct and no stale Devin copies remain."
+}
+
+Test-Install

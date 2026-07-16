@@ -19,9 +19,13 @@ function Remove-LinkIfExists {
     if (-not (Test-Path $Path)) { return }
 
     $item = Get-Item -LiteralPath $Path
-    if ($item.LinkType) {
-        # SymbolicLink, Junction, or HardLink — delete the reparse point/link, not the target.
-        $item.Delete()
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        # Only remove reparse points (symbolic links, junctions, etc.), never real files.
+        if ($item.PSIsContainer) {
+            [System.IO.Directory]::Delete($Path, $false)
+        } else {
+            [System.IO.File]::Delete($Path)
+        }
         Write-Host "Removed: $Path"
     }
 }
@@ -31,13 +35,12 @@ function Remove-Safe {
     if (-not (Test-Path $Path)) { return }
 
     $item = Get-Item -LiteralPath $Path
-    if ($item.LinkType) {
-        # SymbolicLink, Junction, or HardLink — delete the reparse point/link, not the target.
-        $item.Delete()
-    } elseif ($item.PSIsContainer) {
-        Remove-Item -LiteralPath $Path -Recurse -Force
+    if ($item.PSIsContainer) {
+        # .NET Directory.Delete removes a directory reparse point (symlink/junction)
+        # without recursing into the target. For real directories it recurses.
+        [System.IO.Directory]::Delete($Path, $true)
     } else {
-        Remove-Item -LiteralPath $Path -Force
+        [System.IO.File]::Delete($Path)
     }
     Write-Host "Removed: $Path"
 }
