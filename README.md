@@ -1,9 +1,9 @@
 # AI Agent & Skill Library
 
-A central repository of reusable agent definitions and command skills for Claude and Devin. This repo is the canonical source; the PowerShell scripts in the root symlink them into the tool-specific directories so the agents are picked up by each assistant.
+A central repository of reusable agent definitions and command skills for Claude and Devin. This repo is the canonical source. Devin reads `.agents/` directly; `install.ps1` and `uninstall.ps1` only bridge the files into Claude Code's tool-specific directories, where Claude Code expects them to live.
 
-- `agents-symlink.ps1` — links `agents/<name>/AGENT.md` into `~/.claude/agents/<name>.md` and `~/.devin/agents/<name>`.
-- `skills-symlink.ps1` — links `skills/<name>` into `~/.claude/skills/<name>` and removes stale Devin duplicates.
+- `install.ps1` — creates the Claude Code symlinks and removes stale Devin copies. It skips any tool whose directory does not exist.
+- `uninstall.ps1` — removes the symlinks created by `install.ps1`. It accepts a `-UserRoot` parameter so it can be run as an admin for another user.
 
 ---
 
@@ -85,8 +85,8 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 │   ├── ship/
 │   ├── ui-review/
 │   └── verify-fix/
-├── agents-symlink.ps1
-├── skills-symlink.ps1
+├── install.ps1
+├── uninstall.ps1
 ├── .gitignore
 └── hooks/
     ├── hooks.json
@@ -97,17 +97,26 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 
 ## Usage
 
-1. Run the symlink scripts to make the agents and skills available to Claude and Devin:
+1. Run `install.ps1` to make the agents and skills available to Claude Code. Devin already reads `.agents/` directly.
    ```powershell
-   ./agents-symlink.ps1
-   ./skills-symlink.ps1
+   ./install.ps1
    ```
+   The script defaults to the parent of this `.agents` directory. If you are running as an admin for another user, pass their home directory:
+   ```powershell
+   ./install.ps1 -UserRoot "C:\Users\Matthew.Ford"
+   ```
+   Only the tools whose directories exist (`.claude` and/or `AppData\Roaming\devin`) are touched.
 2. Start a skill from inside the target project:
    ```
    /plan-task "Add payment retry logic to the checkout service"
    /analyse-bug "Checkout intermittently returns 500 for duplicate requests"
    ```
-3. The orchestrator/workflow agents will use the relevant reviewer agents as needed.
+3. To remove the Claude Code symlinks later, run:
+   ```powershell
+   ./uninstall.ps1
+   # or for another user
+   ./uninstall.ps1 -UserRoot "C:\Users\Matthew.Ford"
+   ```
 
 ---
 

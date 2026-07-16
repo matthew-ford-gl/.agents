@@ -24,13 +24,13 @@ Thanks for your interest in contributing to the AI Agent & Skill Library.
 
 - New agent definitions in `agents/<name>/AGENT.md`.
 - New skills in `skills/<name>/SKILL.md`.
-- Improvements to existing agents, skills, symlink scripts, or documentation.
+- Improvements to existing agents, skills, install/uninstall scripts, or documentation.
 
 ## Guidelines
 
 - Follow the existing directory and naming conventions.
 - Keep agent and skill definitions focused on a single responsibility.
-- Test the symlink scripts locally if you change them.
+- Test the install/uninstall scripts locally if you change them.
 - Explain the "why" as well as the "what" in your PR description.
 
 ## Commit style
