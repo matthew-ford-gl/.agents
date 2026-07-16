@@ -19,7 +19,8 @@ function Remove-Safe {
     if (-not (Test-Path $Path)) { return }
 
     $item = Get-Item -LiteralPath $Path
-    if ($item.LinkType -eq 'SymbolicLink') {
+    if ($item.LinkType) {
+        # SymbolicLink, Junction, or HardLink — delete the reparse point/link, not the target.
         $item.Delete()
     } elseif ($item.PSIsContainer) {
         Remove-Item -LiteralPath $Path -Recurse -Force

@@ -19,10 +19,27 @@ function Remove-LinkIfExists {
     if (-not (Test-Path $Path)) { return }
 
     $item = Get-Item -LiteralPath $Path
-    if ($item.LinkType -eq 'SymbolicLink') {
+    if ($item.LinkType) {
+        # SymbolicLink, Junction, or HardLink — delete the reparse point/link, not the target.
         $item.Delete()
         Write-Host "Removed: $Path"
     }
+}
+
+function Remove-Safe {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return }
+
+    $item = Get-Item -LiteralPath $Path
+    if ($item.LinkType) {
+        # SymbolicLink, Junction, or HardLink — delete the reparse point/link, not the target.
+        $item.Delete()
+    } elseif ($item.PSIsContainer) {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+    } else {
+        Remove-Item -LiteralPath $Path -Force
+    }
+    Write-Host "Removed: $Path"
 }
 
 if (-not (Test-Path $UserRoot)) {
@@ -57,14 +74,14 @@ if (Test-Path $devinRoot) {
     if (Test-Path $canonicalAgentsRoot) {
         foreach ($agentDir in Get-ChildItem -Directory -Path $canonicalAgentsRoot | Sort-Object Name) {
             $devinFolder = Join-Path $devinAgentsDir $agentDir.Name
-            Remove-LinkIfExists -Path $devinFolder
+            Remove-Safe -Path $devinFolder
         }
     }
 
     if (Test-Path $canonicalSkillsRoot) {
         foreach ($skillDir in Get-ChildItem -Directory -Path $canonicalSkillsRoot | Sort-Object Name) {
             $devinDupe = Join-Path $devinSkillsDir $skillDir.Name
-            Remove-LinkIfExists -Path $devinDupe
+            Remove-Safe -Path $devinDupe
         }
     }
 } else {
