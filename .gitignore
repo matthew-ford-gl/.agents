@@ -5,6 +5,7 @@
 !.gitignore
 !/*.md
 !/*.ps1
+!/*.sh
 !skills/
 !skills/**
 !agents/

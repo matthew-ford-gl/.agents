@@ -30,7 +30,7 @@ Thanks for your interest in contributing to the AI Agent & Skill Library.
 
 - Follow the existing directory and naming conventions.
 - Keep agent and skill definitions focused on a single responsibility.
-- Test the install/uninstall scripts locally if you change them.
+- Test the install/uninstall scripts for your platform (`.ps1` for Windows, `.sh` for Mac) locally if you change them.
 - Explain the "why" as well as the "what" in your PR description.
 
 ## Commit style

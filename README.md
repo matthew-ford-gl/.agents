@@ -1,9 +1,9 @@
 # AI Agent & Skill Library
 
-A central repository of reusable agent definitions and command skills for Claude and Devin. This repo is the canonical source. Devin reads `.agents/` directly; `install.ps1` and `uninstall.ps1` only bridge the files into Claude Code's tool-specific directories, where Claude Code expects them to live.
+A central repository of reusable agent definitions and command skills for Claude and Devin. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts only bridge the files into Claude Code's tool-specific directories, where Claude Code expects them to live.
 
-- `install.ps1` — creates the Claude Code symlinks and removes stale Devin copies. It skips any tool whose directory does not exist.
-- `uninstall.ps1` — removes the symlinks created by `install.ps1`.
+- `install-windows.ps1` / `install-mac.sh` — creates the Claude Code symlinks and removes stale Devin copies. It skips any tool whose directory does not exist.
+- `uninstall-windows.ps1` / `uninstall-mac.sh` — removes the symlinks created by the install script.
 
 ---
 
@@ -85,8 +85,10 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 │   ├── ship/
 │   ├── ui-review/
 │   └── verify-fix/
-├── install.ps1
-├── uninstall.ps1
+├── install-mac.sh
+├── install-windows.ps1
+├── uninstall-mac.sh
+├── uninstall-windows.ps1
 ├── .gitignore
 └── hooks/
     ├── hooks.json
@@ -99,20 +101,45 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 
 This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `C:\Users\<you>\.agents`). The install scripts derive all tool paths from the parent of this `.agents` directory.
 
-1. Run `install.ps1` to make the agents and skills available to Claude Code. Devin already reads `.agents/` directly.
+1. Run the install script for your platform to make the agents and skills available to Claude Code. Devin already reads `.agents/` directly.
+
+   **Windows:**
    ```powershell
-   ./install.ps1
+   ./install-windows.ps1
    ```
-   Only the tools whose directories exist (`.claude` and/or `AppData\Roaming\devin`) are touched.
+
+   **Mac / Linux:**
+   ```bash
+   ./install-mac.sh
+   ```
+
+   Only the tools whose directories exist (`.claude` and/or `.devin` / `AppData\Roaming\devin`) are touched.
+
+   The Mac installer also supports optional flags and a target directory:
+   ```bash
+   ./install-mac.sh --devin      # install Devin symlinks only
+   ./install-mac.sh --claude     # install Claude symlinks only (default)
+   ./install-mac.sh --claude --devin
+   ./install-mac.sh /path/to/project --claude --devin
+   ```
 2. Start a skill from inside the target project:
    ```
    /plan-task "Add payment retry logic to the checkout service"
    /analyse-bug "Checkout intermittently returns 500 for duplicate requests"
    ```
-3. To remove the Claude Code symlinks later, run:
+3. To remove the Claude Code symlinks later, run the matching uninstall script:
+
+   **Windows:**
    ```powershell
-   ./uninstall.ps1
+   ./uninstall-windows.ps1
    ```
+
+   **Mac / Linux:**
+   ```bash
+   ./uninstall-mac.sh
+   ```
+
+   The Mac uninstaller supports the same optional flags as the installer.
 
 ---
 
