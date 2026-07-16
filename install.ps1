@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param(
-    # The user's profile/home directory. Defaults to the parent of this .agents repo,
-    # which is correct when the repo lives at e.g. C:\Users\<user>\.agents.
-    [string]$UserRoot = (Split-Path -Parent $PSScriptRoot)
-)
+param()
 
 $ErrorActionPreference = 'Stop'
+
+# The repo must be cloned into the user's home as ~/.agents so the parent of
+# $PSScriptRoot is the correct user profile.
+$UserRoot = Split-Path -Parent $PSScriptRoot
 
 $canonicalAgentsRoot = Join-Path $PSScriptRoot 'agents'
 $canonicalSkillsRoot = Join-Path $PSScriptRoot 'skills'

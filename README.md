@@ -3,7 +3,7 @@
 A central repository of reusable agent definitions and command skills for Claude and Devin. This repo is the canonical source. Devin reads `.agents/` directly; `install.ps1` and `uninstall.ps1` only bridge the files into Claude Code's tool-specific directories, where Claude Code expects them to live.
 
 - `install.ps1` — creates the Claude Code symlinks and removes stale Devin copies. It skips any tool whose directory does not exist.
-- `uninstall.ps1` — removes the symlinks created by `install.ps1`. It accepts a `-UserRoot` parameter so it can be run as an admin for another user.
+- `uninstall.ps1` — removes the symlinks created by `install.ps1`.
 
 ---
 
@@ -97,13 +97,11 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 
 ## Usage
 
+This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `C:\Users\<you>\.agents`). The install scripts derive all tool paths from the parent of this `.agents` directory.
+
 1. Run `install.ps1` to make the agents and skills available to Claude Code. Devin already reads `.agents/` directly.
    ```powershell
    ./install.ps1
-   ```
-   The script defaults to the parent of this `.agents` directory. If you are running as an admin for another user, pass their home directory:
-   ```powershell
-   ./install.ps1 -UserRoot "C:\Users\Matthew.Ford"
    ```
    Only the tools whose directories exist (`.claude` and/or `AppData\Roaming\devin`) are touched.
 2. Start a skill from inside the target project:
@@ -114,8 +112,6 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 3. To remove the Claude Code symlinks later, run:
    ```powershell
    ./uninstall.ps1
-   # or for another user
-   ./uninstall.ps1 -UserRoot "C:\Users\Matthew.Ford"
    ```
 
 ---
