@@ -10,6 +10,7 @@ $UserRoot = Split-Path -Parent $PSScriptRoot
 
 $canonicalAgentsRoot = Join-Path $PSScriptRoot 'agents'
 $canonicalSkillsRoot = Join-Path $PSScriptRoot 'skills'
+$canonicalHooksFile  = Join-Path $PSScriptRoot 'hooks\hooks.json'
 
 $claudeRoot = Join-Path $UserRoot '.claude'
 $devinRoot = Join-Path $UserRoot 'AppData\Roaming\devin'
@@ -105,6 +106,22 @@ function Install-Skills {
     }
 }
 
+function Install-Hooks {
+    if (-not (Test-Path $canonicalHooksFile)) { return }
+    if (-not (Test-Path $claudeRoot)) { return }
+
+    $claudeSettingsLocal = Join-Path $claudeRoot 'settings.local.json'
+    Remove-Safe -Path $claudeSettingsLocal
+    # Try symlink first; fall back to hardlink (no elevation required for files)
+    try {
+        New-Item -ItemType SymbolicLink -Path $claudeSettingsLocal -Target $canonicalHooksFile -ErrorAction Stop | Out-Null
+        Write-Host "Linked hooks: settings.local.json (symlink)"
+    } catch {
+        New-Item -ItemType HardLink -Path $claudeSettingsLocal -Target $canonicalHooksFile | Out-Null
+        Write-Host "Linked hooks: settings.local.json (hardlink)"
+    }
+}
+
 if (-not (Test-Path $UserRoot)) {
     throw "User root not found: $UserRoot"
 }
@@ -118,6 +135,7 @@ if (-not (Test-Path $devinRoot)) {
 
 Install-Agents
 Install-Skills
+Install-Hooks
 
 function Test-Link {
     param([string]$Path, [string]$ExpectedTarget)
@@ -184,6 +202,32 @@ function Test-Install {
                 $devinDupe = Join-Path $devinRoot "skills\$name"
                 $failure = Test-NoStaleDevin -Path $devinDupe -Name $name
                 if ($failure) { $failures.Add($failure) }
+            }
+        }
+    }
+
+    # Verify hooks link (symlink or hardlink)
+    if (Test-Path $canonicalHooksFile) {
+        if (Test-Path $claudeRoot) {
+            $claudeSettingsLocal = Join-Path $claudeRoot 'settings.local.json'
+            if (-not (Test-Path $claudeSettingsLocal)) {
+                $failures.Add("$claudeSettingsLocal is missing")
+            } else {
+                $item = Get-Item -LiteralPath $claudeSettingsLocal
+                # Accept symlink pointing to the right target, or hardlink (same content)
+                if ($item.Target) {
+                    $actual = $item.Target | Select-Object -First 1
+                    if ($actual -ne $canonicalHooksFile) {
+                        $failures.Add("$claudeSettingsLocal points to $actual, expected $canonicalHooksFile")
+                    }
+                } else {
+                    # Hardlink — verify content matches
+                    $expected = Get-Content -Raw $canonicalHooksFile
+                    $actual = Get-Content -Raw $claudeSettingsLocal
+                    if ($expected -ne $actual) {
+                        $failures.Add("$claudeSettingsLocal content does not match $canonicalHooksFile")
+                    }
+                }
             }
         }
     }

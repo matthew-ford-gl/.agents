@@ -33,6 +33,7 @@ TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
 
 AGENTS_SOURCE="$SCRIPT_DIR/agents"
 SKILLS_SOURCE="$SCRIPT_DIR/skills"
+HOOKS_SOURCE="$SCRIPT_DIR/hooks/hooks.json"
 
 echo "Installing agents and skills from $SCRIPT_DIR into $TARGET_DIR"
 
@@ -112,6 +113,16 @@ if [[ -d "$SKILLS_SOURCE" ]]; then
             echo "Linked Devin skill: $devin_link -> $skill_dir"
         fi
     done
+fi
+
+# Hooks — symlink hooks.json to ~/.claude/settings.local.json
+if [[ -f "$HOOKS_SOURCE" ]]; then
+    CLAUDE_SETTINGS_LOCAL="$TARGET_DIR/.claude/settings.local.json"
+    if [[ -e "$CLAUDE_SETTINGS_LOCAL" || -L "$CLAUDE_SETTINGS_LOCAL" ]]; then
+        rm -f "$CLAUDE_SETTINGS_LOCAL"
+    fi
+    ln -s "$HOOKS_SOURCE" "$CLAUDE_SETTINGS_LOCAL"
+    echo "Linked hooks: $CLAUDE_SETTINGS_LOCAL -> $HOOKS_SOURCE"
 fi
 
 # Remove stale Devin copies when Devin is present but not being linked.

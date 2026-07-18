@@ -80,4 +80,11 @@ if [[ -d "$SKILLS_SOURCE" ]]; then
     done
 fi
 
+# Remove hooks symlink
+CLAUDE_SETTINGS_LOCAL="$TARGET_DIR/.claude/settings.local.json"
+if [[ -L "$CLAUDE_SETTINGS_LOCAL" ]]; then
+    rm -f "$CLAUDE_SETTINGS_LOCAL"
+    echo "Removed hooks symlink: $CLAUDE_SETTINGS_LOCAL"
+fi
+
 echo "Done."

@@ -10,6 +10,7 @@ $UserRoot = Split-Path -Parent $PSScriptRoot
 
 $canonicalAgentsRoot = Join-Path $PSScriptRoot 'agents'
 $canonicalSkillsRoot = Join-Path $PSScriptRoot 'skills'
+$canonicalHooksFile  = Join-Path $PSScriptRoot 'hooks\hooks.json'
 
 $claudeRoot = Join-Path $UserRoot '.claude'
 $devinRoot = Join-Path $UserRoot 'AppData\Roaming\devin'
@@ -66,6 +67,10 @@ if (Test-Path $claudeRoot) {
             Remove-LinkIfExists -Path $claudeLink
         }
     }
+
+    # Remove hooks symlink
+    $claudeSettingsLocal = Join-Path $claudeRoot 'settings.local.json'
+    Remove-LinkIfExists -Path $claudeSettingsLocal
 } else {
     Write-Warning "Claude folder not found at $claudeRoot — nothing to remove"
 }

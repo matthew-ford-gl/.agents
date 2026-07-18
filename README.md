@@ -1,8 +1,8 @@
 # AI Agent & Skill Library
 
-A central repository of reusable agent definitions and command skills for Claude and Devin. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts only bridge the files into Claude Code's tool-specific directories, where Claude Code expects them to live.
+A central repository of reusable agent definitions, command skills, and lifecycle hooks for Claude Code and Devin CLI. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts symlink agents, skills, and hooks into the directories where Claude Code and Devin CLI expect them.
 
-- `install-windows.ps1` / `install-mac.sh` — creates the Claude Code symlinks and removes stale Devin copies. It skips any tool whose directory does not exist.
+- `install-windows.ps1` / `install-mac.sh` — creates symlinks for agents, skills, and hooks; removes stale Devin copies. Skips any component whose source does not exist.
 - `uninstall-windows.ps1` / `uninstall-mac.sh` — removes the symlinks created by the install script.
 
 ---
@@ -52,6 +52,50 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 
 ---
 
+## Hooks
+
+Hooks are shell scripts that run automatically at specific points in the Devin CLI / Claude Code lifecycle. The canonical definition lives in `hooks/hooks.json` and the scripts in `hooks/scripts/`. The install scripts symlink `hooks.json` to `~/.claude/settings.local.json`, where both Devin CLI and Claude Code pick it up automatically.
+
+| Hook | Events | What it does |
+|------|--------|--------------|
+| `send-ai-alert.sh` | `Stop`, `Notification`, `SessionEnd` | POSTs an alert to an external API when the agent stops for input, sends a notification, or the session ends. Derives `repo` from `git remote` (supports Azure DevOps and GitHub/GitLab URLs) and `taskDescription` from the current branch. Fire-and-forget — never blocks the agent. |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ECHO_ALERT_API_KEY` | Yes | API key for the alert endpoint. The hook silently exits if this is not set. |
+
+Set the API key as a persistent environment variable before running the install script:
+
+**Windows (PowerShell):**
+```powershell
+[Environment]::SetEnvironmentVariable('ECHO_ALERT_API_KEY', '<your-key>', 'User')
+```
+
+**Mac / Linux:**
+```bash
+echo 'export ECHO_ALERT_API_KEY="<your-key>"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Alert API Schema
+
+The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
+
+```json
+{
+  "taskDescription": "Working on branch: feat/my-feature",
+  "repo": "org/project/repo",
+  "reason": "Agent stopped — waiting for user input",
+  "timestamp": "2026-07-18T13:42:33Z"
+}
+```
+
+`taskDescription`, `repo`, and `reason` are required. `timestamp` defaults to UTC now.
+
+---
+
 ## Repository Layout
 
 ```
@@ -93,6 +137,7 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 └── hooks/
     ├── hooks.json
     └── scripts/
+        └── send-ai-alert.sh
 ```
 
 ---
