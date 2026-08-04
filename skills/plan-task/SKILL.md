@@ -24,9 +24,22 @@ Read `$ARGUMENTS` to extract:
 
 ---
 
+## Spawning mechanism
+
+Detect which runtime you are in and use its native mechanism for parallel agents —
+"Task"/"subagent" naming below is descriptive, not a literal tool name in every host.
+
+- **Claude Code**: spawn each agent as a `Task` tool call with `subagent_type` set to the
+  named persona.
+- **Devin CLI**: spawn each agent with the `run_subagent` tool, `profile: "<name>"`,
+  `is_background: true` for every agent launched in the same phase, then collect each with
+  `read_subagent` (`block: true`) once all have been launched in that phase. If a `profile`
+  is rejected as unrecognized, tell the human it's missing and continue with the rest.
+- **Other hosts**: use whatever native parallel-subagent primitive is available.
+
 ## Phase B: Parallel Analysis (3 agents simultaneously)
 
-Launch THREE agents in parallel:
+Launch THREE agents in parallel, using the Spawning mechanism above:
 
 **Agent 1 — Risk & Compatibility Analyst**: Analyse backward compatibility and change risk.
 - What existing behaviour could break? What consumers depend on the changed interface?
@@ -74,8 +87,8 @@ Save to `{task-slug}-implementation.md`.
 
 ## Phase D: Discussion Round 1 — Initial Positions (6 agents simultaneously)
 
-Launch SIX discussion personas in parallel, each receiving the full implementation plan
-and all three analyst outputs:
+Launch SIX discussion personas in parallel, using the Spawning mechanism above, each
+receiving the full implementation plan and all three analyst outputs:
 
 - **Guardian** (subagent: `guardian`) → Save to `{task-slug}-R1-guardian.md`
 - **Craftsman** (subagent: `craftsman`) → Save to `{task-slug}-R1-craftsman.md`
@@ -168,7 +181,8 @@ Wait for human response before proceeding.
 
 ## Phase I: Orchestrator Handoff
 
-Invoke the Orchestrator using the Agent tool with subagent type `orchestrator`.
+Invoke the Orchestrator using the Spawning mechanism above, with profile/subagent type
+`orchestrator`.
 
 Pass the following in the prompt:
 

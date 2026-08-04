@@ -48,6 +48,25 @@ For each agent, resolve its file by checking, in order, and using the first that
 `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
 `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`.
 
+## Spawning mechanism
+
+Detect which runtime you are in and use its native mechanism for parallel reviewers —
+"Task" is not a universal name.
+
+- **Claude Code**: spawn each reviewer as a `Task` tool call with `subagent_type` set to
+  the agent's `name`. If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is enabled and you want
+  reviewers to challenge each other's findings rather than just report back individually,
+  explicitly say "spawn an agent team" in your own reasoning before using the `Agent` tool
+  — Claude defaults to classic subagents unless a team is explicitly requested.
+- **Devin CLI**: spawn each reviewer with the `run_subagent` tool, `profile: "<name>"`,
+  `is_background: true` for every reviewer at once, then collect each with `read_subagent`
+  (`block: true`) once all have been launched. If a `profile` is rejected as unrecognized,
+  do not silently absorb that reviewer's persona into your own reasoning as a substitute —
+  tell the human the profile is missing and continue with the remaining reviewers.
+- **Other hosts**: use whatever native parallel-subagent primitive is available. If none
+  exists, say explicitly that a reviewer is being run inline rather than presenting inline
+  reasoning as if it were an independent review.
+
 ## Steps
 
 0. Before anything else, run: `pwsh -Command "Sync-AgentContext -TargetRepo (Get-Location)"`.
@@ -76,7 +95,7 @@ For each agent, resolve its file by checking, in order, and using the first that
 3. Produce a plan: files to change, why, risks, test strategy.
    STOP and wait for human approval before continuing.
 
-4. Fan out plan-stage reviewers as parallel Tasks.
+4. Fan out plan-stage reviewers in parallel, using the Spawning mechanism above.
 
    Always pass to every reviewer:
    - The approved plan
@@ -158,8 +177,8 @@ For each agent, resolve its file by checking, in order, and using the first that
     - Any standards/playbooks loaded in step 2
     If it returns BLOCKED, address the gaps and loop back to step 7a.
 
-8. Run diff-stage reviewers as parallel Tasks, passing the approved plan, the diff, and
-   any standards/playbooks loaded in step 2.
+8. Run diff-stage reviewers in parallel, using the Spawning mechanism above, passing the
+   approved plan, the diff, and any standards/playbooks loaded in step 2.
 
    code-reviewer: no special instruction needed.
 

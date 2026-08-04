@@ -44,6 +44,25 @@ For each agent, resolve its file by checking, in order, and using the first that
 `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
 `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`.
 
+## Spawning mechanism
+
+Detect which runtime you are in and use its native mechanism for parallel reviewers —
+"Task" is not a universal name.
+
+- **Claude Code**: spawn each reviewer as a `Task` tool call with `subagent_type` set to
+  the agent's `name`.
+- **Devin CLI**: spawn each reviewer with the `run_subagent` tool, `profile: "<name>"`,
+  `is_background: true` for every reviewer at once, then collect each with `read_subagent`
+  (`block: true`) once all have been launched. If a `profile` is rejected as unrecognized,
+  do not silently absorb that reviewer's persona into your own reasoning as a substitute —
+  end the attempt as a failed attempt (per Loop safety) and note the missing profile.
+- **Other hosts**: use whatever native parallel-subagent primitive is available. If none
+  exists, say explicitly that a reviewer is being run inline rather than presenting inline
+  reasoning as if it were an independent review.
+
+This loop runs unattended (see Loop safety below), so agent teams are not appropriate here
+even where available — teams expect a human to interact with teammates directly.
+
 ## Loop safety
 
 The loop is autonomous: there are no human STOP points. Wherever the Orchestrator would
@@ -228,8 +247,9 @@ Custom Tailwind variants (defined in `src/index.css`):
 | `landscape:` | `@media (orientation: landscape) and (max-height: 500px)` |
 | `tablet-landscape:` | `@media (orientation: landscape) and (min-height: 501px) and (min-width: 768px)` |
 
-**F4 (step 4).** Fan out the three plan-stage reviewers as parallel Tasks, passing the plan,
-actual file contents (not paths), and the loaded standards.
+**F4 (step 4).** Fan out the three plan-stage reviewers in parallel, using the Spawning
+mechanism above, passing the plan, actual file contents (not paths), and the loaded
+standards.
 
 **F5 (step 5).** Consolidate feedback. Any BLOCKED → end this attempt as a failed attempt
 (return to L5 path B). Do not STOP.
@@ -266,10 +286,10 @@ the diff, all test file contents, and the loaded standards, with this assessment
 If BLOCKED, address the gaps and loop back to F7a, subject to the 3-cycle bound. Exceeding the
 bound ends this attempt as a failed attempt.
 
-**F8 (step 8).** Run `code-reviewer` as a Task, passing the plan, the diff, and the loaded
-standards. If it returns BLOCKED or lists MUST-FIX items, address them and loop back to F7a,
-subject to the 3-cycle bound. Should-fix and nit items are recorded for the final PR notes
-but do not block.
+**F8 (step 8).** Run `code-reviewer`, using the Spawning mechanism above, passing the plan,
+the diff, and the loaded standards. If it returns BLOCKED or lists MUST-FIX items, address
+them and loop back to F7a, subject to the 3-cycle bound. Should-fix and nit items are
+recorded for the final PR notes but do not block.
 
 **F-commit.** Commit the fix onto the run branch with a message naming the route and attempt.
 Do not push per commit (push happens once at L1) unless your remote requires it. Return to L5
