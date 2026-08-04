@@ -172,6 +172,8 @@ function Test-Install {
             $sourceFile = Join-Path $agentDir.FullName 'AGENT.md'
             $claudeFile = Join-Path $claudeAgentsDir "$name.md"
 
+            if (-not (Test-Path $sourceFile)) { continue }
+
             if (Test-Path $claudeRoot) {
                 $failure = Test-Link -Path $claudeFile -ExpectedTarget $sourceFile
                 if ($failure) { $failures.Add($failure) }
@@ -191,7 +193,10 @@ function Test-Install {
         foreach ($skillDir in Get-ChildItem -Directory -Path $canonicalSkillsRoot | Sort-Object Name) {
             $name = $skillDir.Name
             $sourceFolder = $skillDir.FullName
+            $sourceFile = Join-Path $sourceFolder 'SKILL.md'
             $claudeLink = Join-Path $claudeSkillsDir $name
+
+            if (-not (Test-Path $sourceFile)) { continue }
 
             if (Test-Path $claudeRoot) {
                 $failure = Test-Link -Path $claudeLink -ExpectedTarget $sourceFolder
