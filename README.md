@@ -144,35 +144,37 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 
 ## Usage
 
-This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `C:\Users\<you>\.agents`). The install scripts derive all tool paths from the parent of this `.agents` directory.
+This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `C:\Users\<you>\.agents`). The install scripts derive all tool paths from the parent of this `.agents` directory, so cloning it anywhere else (e.g. alongside your other projects in `~/Documents/GitHub/agents-and-skills-library`) changes what running the scripts with no arguments does — the "parent directory" becomes wherever the repo actually lives, not your home directory. If you didn't clone it to `~/.agents`, either move/re-clone it there first, or always pass an explicit target directory (see step 1).
 
-1. Run the install script for your platform to make the agents and skills available to Claude Code. Devin already reads `.agents/` directly.
+1. Run the install script for your platform to make the agents, skills, and hooks available to Claude Code. Devin already reads `.agents/` directly — but only because this repo's own `agents/`/`skills/` folders match the layout Devin CLI expects at `~/.agents/{agents,skills}`, which is only true when the repo is cloned exactly at `~/.agents`.
 
    **Windows:**
    ```powershell
    ./install-windows.ps1
    ```
 
+   `install-windows.ps1` auto-detects which tools to install for: it only touches `.claude` and/or `AppData\Roaming\devin` if that directory already exists under your user profile.
+
    **Mac / Linux:**
    ```bash
    ./install-mac.sh
    ```
 
-   Only the tools whose directories exist (`.claude` and/or `.devin` / `AppData\Roaming\devin`) are touched.
-
-   The Mac installer also supports optional flags and a target directory:
+   `install-mac.sh` does **not** auto-detect existing tool directories — it defaults to `--claude` only. Pass `--devin` explicitly to also install Devin symlinks, even if `.devin` already exists:
    ```bash
    ./install-mac.sh --devin      # install Devin symlinks only
    ./install-mac.sh --claude     # install Claude symlinks only (default)
    ./install-mac.sh --claude --devin
    ./install-mac.sh /path/to/project --claude --devin
    ```
+
+   Both scripts also symlink `hooks/hooks.json` to `settings.local.json` in the Claude directory whenever `.claude` is present, regardless of which `--claude`/`--devin` flags you pass.
 2. Start a skill from inside the target project:
    ```
    /plan-task "Add payment retry logic to the checkout service"
    /analyse-bug "Checkout intermittently returns 500 for duplicate requests"
    ```
-3. To remove the Claude Code symlinks later, run the matching uninstall script:
+3. To remove the symlinks later, run the matching uninstall script:
 
    **Windows:**
    ```powershell
@@ -184,7 +186,7 @@ This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `
    ./uninstall-mac.sh
    ```
 
-   The Mac uninstaller supports the same optional flags as the installer.
+   Both uninstallers remove the Claude and/or Devin agent/skill symlinks (per the same `--claude`/`--devin` flags as the installer) as well as the hooks symlink, which is always removed regardless of flags.
 
 ---
 
