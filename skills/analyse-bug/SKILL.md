@@ -274,7 +274,7 @@ If any of the above is missing or vague, **do not assume it was fine and do not 
 Phase 8 automatically.** If the Orchestrator ran as a resumable session, send a follow-up
 asking it to report the missing verdicts explicitly. If the session is no longer resumable,
 stop, tell the human plainly what is missing, and re-run the missing review(s) directly
-(e.g. spawn `security-analyst` against the actual merged diff) before continuing.
+(e.g. spawn `security-analyst` against the actual PR diff) before continuing.
 
 Only proceed to Phase 8 once the reviewer verdicts are accounted for.
 
