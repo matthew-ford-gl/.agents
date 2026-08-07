@@ -217,7 +217,7 @@ IMPACT ANALYSIS:
 ## Phase J: Verify the Handoff Report — do not take it on faith
 
 When the Orchestrator returns (this applies whether it ran in the foreground or as a
-background subagent via `read_subagent`), check its final report against the Orchestrator's
+background subagent via `run_subagent` and was collected with `read_subagent`), check its final report against the Orchestrator's
 own contract (step 10 of `orchestrator/AGENT.md`) before presenting anything to the human.
 
 The report must explicitly state, at minimum:
