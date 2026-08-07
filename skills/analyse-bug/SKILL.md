@@ -257,7 +257,7 @@ Verify using the query in the ROOT-CAUSE.md Verification section.
 ## Phase 7b: Verify the Handoff Report — do not take it on faith
 
 Before chaining automatically into Phase 8, check the Orchestrator's final report (this
-applies whether it ran in the foreground or as a background subagent via `read_subagent`)
+applies whether it ran in the foreground or as a background subagent via `run_subagent`, collected with `read_subagent`)
 against its own contract (step 10 of `orchestrator/AGENT.md`).
 
 The report must explicitly state, at minimum:
