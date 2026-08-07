@@ -14,11 +14,20 @@ Two agents independently attack the plan from different angles. Unlike the debat
 
 ---
 
-## Step 1: Load the Plan
+## Step 1: Load the Plan and Project Context
 
 Read `$ARGUMENTS`. If it is a file path, read it fully. If it is a description, treat it as the plan.
 
+Before launching reviewers, load the project-specific context:
+1. Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the paths mentioned
+   in the plan. Treat repository instructions as mandatory.
+2. If `.claude/CLAUDE.md` exists in the repo root, read it.
+3. If `.context/index.md` exists, scan it for keywords matching the plan's domain and load
+   every matched standard, playbook, and convention file into your context.
+
 Also read the relevant source files mentioned in the plan so both agents have codebase context.
+
+Pass all loaded project context to the agents you spawn.
 
 ---
 

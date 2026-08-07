@@ -17,10 +17,16 @@ Three agents independently verify different aspects of the fix. Unlike code revi
 ## Step 1: Load Context
 
 Read `$ARGUMENTS`. Load:
+- The repository root `AGENTS.md` and any nearer `AGENTS.md` files for the affected paths.
+  Treat repository instructions as mandatory.
+- `.claude/CLAUDE.md` from the repo root, if it exists.
+- `.context/index.md` and any matched standards/playbooks for the bug/fix domain, if present.
 - The ROOT-CAUSE.md if provided (root cause, fix description, verification query)
 - The diff or relevant changed files
 - The test files added or modified as part of the fix
 - Any existing known-bugs or incident documentation for context
+
+Pass all loaded project context to the agents you spawn.
 
 ---
 
