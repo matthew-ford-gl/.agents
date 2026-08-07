@@ -206,3 +206,27 @@ Detect which runtime you are in and use its native mechanism for parallel review
      - Notes (test execution status, known issues, things not included or done)
      - Rollback conditions (from DECISION.md if present)
    - Report the PR URL.
+
+10. **Final report to the caller — always include reviewer verdicts.**
+
+    Your terminal message back to whoever invoked you (human or parent skill/agent) is the
+    only record they will have of this run. This matters most when you were launched as a
+    background subagent (e.g. via `run_subagent` with `is_background: true`): the caller
+    cannot see your intermediate tool calls or the individual reviewer sub-sessions, and once
+    you finish, your session is not resumable — anything you don't state explicitly is lost.
+
+    The final report must include, regardless of invocation mode:
+    - **Plan-stage reviewers**: every reviewer that ran (permanent + any conditional ones
+      triggered), each with its verdict (APPROVED/BLOCKED) and one line of rationale.
+      Explicitly name `security-analyst`'s verdict — never omit it even if it was
+      unremarkable.
+    - **Diff-stage reviewers**: same format, for the diff-stage pass in step 8.
+    - Any reviewer that could not run (e.g. unrecognized profile) — name it and say so;
+      do not silently absorb its persona into your own reasoning as a substitute.
+    - CI/test gate status (from step 7a).
+    - Any self-flagged caveats or deferred items.
+    - The PR URL.
+
+    Do not summarize this down to just "shipped files + gate status + caveats" — reviewer
+    verdicts are load-bearing information the caller needs to verify the change was actually
+    checked, not just built and tested.

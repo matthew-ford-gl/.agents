@@ -211,3 +211,26 @@ TEST STRATEGY:
 IMPACT ANALYSIS:
 {full contents of {task-slug}-impact.md}
 ```
+
+---
+
+## Phase J: Verify the Handoff Report — do not take it on faith
+
+When the Orchestrator returns (this applies whether it ran in the foreground or as a
+background subagent via `read_subagent`), check its final report against the Orchestrator's
+own contract (step 10 of `orchestrator/AGENT.md`) before presenting anything to the human.
+
+The report must explicitly state, at minimum:
+- Every plan-stage reviewer that ran and its verdict — including `security-analyst` by name.
+- Every diff-stage reviewer that ran and its verdict.
+- Any reviewer that could not run (e.g. unrecognized profile) and why.
+- CI/test gate status and the PR URL.
+
+If any of the above is missing or vague (e.g. a generic "all checks passed" with no
+per-reviewer breakdown), **do not assume it was fine and do not silently fill the gap
+yourself.** If the Orchestrator ran as a resumable session, send a follow-up asking it to
+report the missing verdicts explicitly. If the session is no longer resumable, say so plainly
+to the human and re-run the missing review(s) directly (e.g. spawn `security-analyst` against
+the actual merged diff) rather than presenting the plan as fully verified.
+
+Only proceed to reporting results to the human once the reviewer verdicts are accounted for.

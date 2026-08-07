@@ -90,6 +90,8 @@ A route that exhausts 5 attempts is logged and skipped (path C).
 - `current`   — route being processed this iteration.
 - `attempt`   — fix attempts on the current route; reset to `1` on advance.
 - `branch`    — the single branch all fixes commit onto for this run.
+- `reviewLog` — array of per-route, per-attempt reviewer verdict records (see F5/F8 below),
+  carried forward across resumes; never cleared.
 
 Route order:
 
@@ -145,6 +147,12 @@ If `completed` contains all 7 routes, raise the single PR for the run:
   - Main files changed and why
   - Review & Testing Checklist for a human
   - Notes: screenshots committed, any route that hit path C, test execution status
+  - **Reviewer verdicts**: a table built from `reviewLog`, one row per route, showing the
+    final (last-attempt) verdict for each plan-stage and diff-stage reviewer — explicitly
+    naming `security-analyst` — plus any route/attempt where a reviewer could not run
+    (missing profile). This loop is fully unattended, so this table is the only record a
+    human reviewing the PR will ever have that security and quality review actually
+    happened per route, not just that the visual gate passed.
 - Print: `✅  All routes clean. Iterative review complete. PR raised: <url>`
 - Stop. Do not schedule another wakeup.
 
@@ -251,8 +259,11 @@ Custom Tailwind variants (defined in `src/index.css`):
 mechanism above, passing the plan, actual file contents (not paths), and the loaded
 standards.
 
-**F5 (step 5).** Consolidate feedback. Any BLOCKED → end this attempt as a failed attempt
-(return to L5 path B). Do not STOP.
+**F5 (step 5).** Consolidate feedback. Append a record to `reviewLog` for this route/attempt
+capturing each plan-stage reviewer's verdict (`senior-engineer`, `qa-gatekeeper`,
+`security-analyst`) — including `"could not run: <reason>"` if a profile was unrecognized —
+and write the state file. Any BLOCKED → end this attempt as a failed attempt (return to
+L5 path B). Do not STOP.
 
 **F6 (step 6).** Implement the fixes, addressing all reviewer feedback.
 
@@ -287,9 +298,11 @@ If BLOCKED, address the gaps and loop back to F7a, subject to the 3-cycle bound.
 bound ends this attempt as a failed attempt.
 
 **F8 (step 8).** Run `code-reviewer`, using the Spawning mechanism above, passing the plan,
-the diff, and the loaded standards. If it returns BLOCKED or lists MUST-FIX items, address
-them and loop back to F7a, subject to the 3-cycle bound. Should-fix and nit items are
-recorded for the final PR notes but do not block.
+the diff, and the loaded standards. Append its verdict (and `qa-gatekeeper`'s
+implementation-review verdict from F7b) to the same `reviewLog` record for this
+route/attempt and write the state file. If it returns BLOCKED or lists MUST-FIX items,
+address them and loop back to F7a, subject to the 3-cycle bound. Should-fix and nit items
+are recorded for the final PR notes but do not block.
 
 **F-commit.** Commit the fix onto the run branch with a message naming the route and attempt.
 Do not push per commit (push happens once at L1) unless your remote requires it. Return to L5
