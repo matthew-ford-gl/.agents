@@ -23,12 +23,20 @@ Plan-stage reviewers — conditional (auto-detected from scope):
 - dependency-reviewer    → when the plan introduces, upgrades, or removes packages or libraries
 - migration-reviewer     → when the plan modifies database schema or changes how persistent data is written
 
-Diff-stage reviewers (always run against the actual diff after tests pass):
+Diff-stage reviewers — permanent (always run against the actual diff after tests pass):
 - qa-gatekeeper (implementation-review mode)
 - code-reviewer
 - guardian
 - performance-reviewer
 - observability-reviewer
+- security-analyst — re-run against the diff, not just skipped after plan-stage. Its own
+  contract is "plan-stage and diff-stage reviewer": implementation details (e.g. how
+  auth/authz logic is actually coded) can introduce vulnerabilities absent from the plan,
+  and `code-reviewer`'s generic security checks are not a substitute for its threat model.
+
+Diff-stage reviewers — conditional (only if the matching plan-stage flag was set):
+- accessibility-reviewer [RUN_ACCESSIBILITY] — its own contract is "plan-stage and
+  diff-stage reviewer"; re-run against the actual rendered UI diff, not just the plan.
 
 ## Pre-approved mode
 
@@ -193,6 +201,15 @@ Detect which runtime you are in and use its native mechanism for parallel review
    observability-reviewer: "Verify new code paths have sufficient logging, metrics, and
    error signals. Conclude with APPROVED or BLOCKED."
 
+   security-analyst: run its normal two-pass review (threat model + standards compliance)
+   against the actual diff, not the plan. Implementation details the plan didn't specify
+   — exact validation logic, how a token claim is checked, error-path information leakage —
+   are exactly what this pass exists to catch. Conclude with APPROVED or BLOCKED.
+
+   accessibility-reviewer [only if RUN_ACCESSIBILITY was set in step 1]: run its normal
+   WCAG review against the actual rendered UI diff, not the plan. Conclude with APPROVED
+   or BLOCKED.
+
    If any reviewer returns BLOCKED or lists MUST-FIX items, address them and loop back to
    step 7a. Should-fix and nit items are reported to the human but do not block.
 
@@ -206,3 +223,27 @@ Detect which runtime you are in and use its native mechanism for parallel review
      - Notes (test execution status, known issues, things not included or done)
      - Rollback conditions (from DECISION.md if present)
    - Report the PR URL.
+
+10. **Final report to the caller — always include reviewer verdicts.**
+
+    Your terminal message back to whoever invoked you (human or parent skill/agent) is the
+    only record they will have of this run. This matters most when you were launched as a
+    background subagent (e.g. via `run_subagent` with `is_background: true`): the caller
+    cannot see your intermediate tool calls or the individual reviewer sub-sessions, and once
+    you finish, your session is not resumable — anything you don't state explicitly is lost.
+
+    The final report must include, regardless of invocation mode:
+    - **Plan-stage reviewers**: every reviewer that ran (permanent + any conditional ones
+      triggered), each with its verdict (APPROVED/BLOCKED) and one line of rationale.
+      Explicitly name `security-analyst`'s verdict — never omit it even if it was
+      unremarkable.
+    - **Diff-stage reviewers**: same format, for the diff-stage pass in step 8.
+    - Any reviewer that could not run (e.g. unrecognized profile) — name it and say so;
+      do not silently absorb its persona into your own reasoning as a substitute.
+    - CI/test gate status (from step 7a).
+    - Any self-flagged caveats or deferred items.
+    - The PR URL.
+
+    Do not summarize this down to just "shipped files + gate status + caveats" — reviewer
+    verdicts are load-bearing information the caller needs to verify the change was actually
+    checked, not just built and tested.

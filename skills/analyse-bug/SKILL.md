@@ -254,9 +254,36 @@ Verify using the query in the ROOT-CAUSE.md Verification section.
 
 ---
 
+## Phase 7b: Verify the Handoff Report — do not take it on faith
+
+Before chaining automatically into Phase 8, check the Orchestrator's final report (this
+applies whether it ran in the foreground or as a background subagent via `run_subagent`, collected with `read_subagent`)
+against its own contract (step 10 of `orchestrator/AGENT.md`).
+
+The report must explicitly state, at minimum:
+- Every plan-stage reviewer that ran and its verdict — including `security-analyst` by name.
+- Every diff-stage reviewer that ran and its verdict.
+- Any reviewer that could not run (e.g. unrecognized profile) and why.
+- CI/test gate status and the PR URL.
+
+This check matters more here than in `/plan-task`: Phases 8 and 9 below run automatically
+with no human in between, so a gap in the Orchestrator's report would otherwise propagate
+silently through verification and the retrospective without anyone ever seeing it.
+
+If any of the above is missing or vague, **do not assume it was fine and do not proceed to
+Phase 8 automatically.** If the Orchestrator ran as a resumable session, send a follow-up
+asking it to report the missing verdicts explicitly. If the session is no longer resumable,
+stop, tell the human plainly what is missing, and re-run the missing review(s) directly
+(e.g. spawn `security-analyst` against the actual PR diff) before continuing.
+
+Only proceed to Phase 8 once the reviewer verdicts are accounted for.
+
+---
+
 ## Phase 8: Fix Verification (automatic)
 
-Once the Orchestrator completes, run `/verify-fix` automatically — do not ask the human.
+Once the Orchestrator completes and its report has been verified per Phase 7b, run
+`/verify-fix` automatically — do not ask the human.
 
 Invoke it as a subagent or inline using the `verify-fix` command, passing:
 - The ROOT-CAUSE.md
