@@ -231,6 +231,6 @@ per-reviewer breakdown), **do not assume it was fine and do not silently fill th
 yourself.** If the Orchestrator ran as a resumable session, send a follow-up asking it to
 report the missing verdicts explicitly. If the session is no longer resumable, say so plainly
 to the human and re-run the missing review(s) directly (e.g. spawn `security-analyst` against
-the actual merged diff) rather than presenting the plan as fully verified.
+the actual PR diff) rather than presenting the plan as fully verified.
 
 Only proceed to reporting results to the human once the reviewer verdicts are accounted for.
