@@ -33,8 +33,16 @@ Detect which runtime you are in and use its native mechanism for parallel agents
   named persona.
 - **Devin CLI**: spawn each agent with the `run_subagent` tool, `profile: "<name>"`,
   `is_background: true` for every agent launched in the same phase, then collect each with
-  `read_subagent` (`block: true`) once all have been launched in that phase. If a `profile`
-  is rejected as unrecognized, tell the human it's missing and continue with the rest.
+  `read_subagent` (`block: true`) once all have been launched in that phase.
+  - **Profile fallback**: if a named profile is rejected as unrecognized (i.e. the agent
+    has an AGENT.md but no matching Devin CLI built-in profile), retry the same agent
+    using `profile: "subagent_general"` instead. Read the agent's AGENT.md file (using the
+    standard path resolution) and pass its full content as the `task` prompt, prefixed with
+    the original instructions you would have given. This ensures the agent still runs with
+    the correct persona — only the runtime profile differs.
+  - **Halt on failure**: if an agent fails to start even after the fallback attempt, STOP
+    and tell the human which agent(s) could not run and why. Do not continue with a partial
+    set — a missing discussion persona degrades the quality of the debate.
 - **Other hosts**: use whatever native parallel-subagent primitive is available.
 
 ## Phase B: Parallel Analysis (3 agents simultaneously)
