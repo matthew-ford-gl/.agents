@@ -68,9 +68,18 @@ Detect which runtime you are in and use its native mechanism for parallel review
   — Claude defaults to classic subagents unless a team is explicitly requested.
 - **Devin CLI**: spawn each reviewer with the `run_subagent` tool, `profile: "<name>"`,
   `is_background: true` for every reviewer at once, then collect each with `read_subagent`
-  (`block: true`) once all have been launched. If a `profile` is rejected as unrecognized,
-  do not silently absorb that reviewer's persona into your own reasoning as a substitute —
-  tell the human the profile is missing and continue with the remaining reviewers.
+  (`block: true`) once all have been launched.
+  - **Profile fallback**: if a named profile is rejected as unrecognized (i.e. the agent
+    has an AGENT.md but no matching Devin CLI built-in profile), retry the same reviewer
+    using `profile: "subagent_general"` instead. Read the agent's AGENT.md file (using the
+    standard path resolution) and pass its full content as the `task` prompt, prefixed with
+    the original review instructions you would have given. This ensures the reviewer still
+    runs with the correct persona — only the runtime profile differs.
+  - **Halt on failure**: if a reviewer subagent fails to start even after the fallback
+    attempt, STOP and tell the human which reviewer(s) could not run and why. Do not
+    silently absorb that reviewer's persona into your own reasoning as a substitute, and
+    do not continue with a partial review pass — a missing reviewer is a quality gap that
+    must be acknowledged before proceeding.
 - **Other hosts**: use whatever native parallel-subagent primitive is available. If none
   exists, say explicitly that a reviewer is being run inline rather than presenting inline
   reasoning as if it were an independent review.
