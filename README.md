@@ -58,7 +58,8 @@ Hooks are shell scripts that run automatically at specific points in the Devin C
 
 | Hook | Events | What it does |
 |------|--------|--------------|
-| `send-ai-alert.sh` | `Stop`, `Notification`, `SessionEnd` | POSTs an alert to an external API when the agent stops for input, sends a notification, or the session ends. Derives `repo` from `git remote` (supports Azure DevOps and GitHub/GitLab URLs) and `taskDescription` from the current branch. Fire-and-forget — never blocks the agent. |
+| `send-ai-alert.sh` / `send-ai-alert.ps1` | `Stop`, `Notification`, `SessionEnd` | POSTs an alert to an external API when the agent stops for input, sends a notification, or the session ends. Derives `repo` from `git remote` (supports Azure DevOps and GitHub/GitLab URLs). Looks up the session's real title and last agent message from the local Devin CLI `sessions.db` (via `session-info.py`) for `taskDescription` and `reason`, falling back to the current git branch/directory name if the DB lookup is unavailable. Fire-and-forget — never blocks the agent. |
+| `session-info.py` | (helper, not a hook) | Queries Devin CLI's local `sessions.db` (SQLite) for a session's `title` and most recent non-empty assistant message, given a `session_id`. Used by `send-ai-alert.*`. Always exits 0 and prints `{"title": null, "last_message": null}` on any failure. |
 
 ### Environment Variables
 
@@ -88,11 +89,12 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
   "taskDescription": "Working on branch: feat/my-feature",
   "repo": "org/project/repo",
   "reason": "Agent stopped — waiting for user input",
+  "sessionUrl": null,
   "timestamp": "2026-07-18T13:42:33Z"
 }
 ```
 
-`taskDescription`, `repo`, and `reason` are required. `timestamp` defaults to UTC now.
+`taskDescription`, `repo`, and `reason` are required. `sessionUrl` is optional/nullable (there is no web UI session for local CLI runs). `timestamp` defaults to UTC now.
 
 ---
 
