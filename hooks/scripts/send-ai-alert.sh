@@ -25,6 +25,11 @@ elif command -v python3 &>/dev/null; then
     PYTHON_BIN="python3"
 fi
 
+if [ -z "$PYTHON_BIN" ]; then
+    echo "send-ai-alert.sh: Python is required but was not found (tried 'python' and 'python3'). Skipping alert." >&2
+    exit 0
+fi
+
 # ── Read stdin (hook event JSON) ─────────────────────────────────────────────
 INPUT=$(cat 2>/dev/null || echo '{}')
 
