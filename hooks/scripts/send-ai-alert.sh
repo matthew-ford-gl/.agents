@@ -3,14 +3,9 @@
 # Called by Devin CLI hooks on Stop, Notification, and SessionEnd events.
 # Always exits 0 so it never blocks the agent.
 #
-# NOTE: This script previously tried to detect and skip subagent invocations by
-# walking the parent process tree looking for a `devin acp` ancestor. That
-# heuristic is no longer valid: in current Devin CLI builds, both the main
-# session's own tool/hook execution AND background subagents run their shell
-# commands as children of the same shared `devin acp` worker process, so the
-# check always matched and the alert never fired. Devin CLI's Stop/SessionEnd
-# hooks are also not documented as firing for subagents (no SubagentStop event
-# or agent_id field), so no subagent filtering should be necessary here.
+# This script now uses session-info.py to look up the Devin sessions.db and
+# determine whether the current session is a subagent. Subagent completions
+# are skipped so only the parent session triggers an Echo alert.
 
 # ── Configuration ────────────────────────────────────────────────────────────
 API_BASE="${ECHO_ALERT_API_BASE:-https://echo.uk.hos.accessacloud.com}"
@@ -22,12 +17,20 @@ fi
 
 ENDPOINT="${API_BASE}/api/alerts/aialert?apikey=${API_KEY}&type=standard"
 
+# Prefer `python`, but fall back to `python3` (e.g. in WSL/Git Bash).
+PYTHON_BIN=""
+if command -v python &>/dev/null; then
+    PYTHON_BIN="python"
+elif command -v python3 &>/dev/null; then
+    PYTHON_BIN="python3"
+fi
+
 # ── Read stdin (hook event JSON) ─────────────────────────────────────────────
 INPUT=$(cat 2>/dev/null || echo '{}')
 
 # Helper: extract a JSON string value by key (lightweight, no jq needed)
 json_val() {
-    echo "$INPUT" | python -c "
+    echo "$INPUT" | $PYTHON_BIN -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -45,18 +48,22 @@ SESSION_ID=$(json_val "session_id" "")
 #    a generic placeholder. Best-effort: any failure here is silently ignored.
 SESSION_TITLE=""
 LAST_MESSAGE=""
-if [ -n "$SESSION_ID" ] && command -v python &>/dev/null; then
+IS_SUBAGENT="false"
+if [ -n "$SESSION_ID" ] && [ -n "$PYTHON_BIN" ]; then
     HELPER_SCRIPT="$(dirname "$0")/session-info.py"
-    for CANDIDATE_DB in "$HOME/.config/devin/cli/sessions.db" "$HOME/Library/Application Support/devin/cli/sessions.db"; do
-        if [ -f "$CANDIDATE_DB" ] && [ -f "$HELPER_SCRIPT" ]; then
-            INFO_JSON=$(python "$HELPER_SCRIPT" "$CANDIDATE_DB" "$SESSION_ID" 2>/dev/null)
-            if [ -n "$INFO_JSON" ]; then
-                SESSION_TITLE=$(echo "$INFO_JSON" | python -c "import sys,json; print(json.load(sys.stdin).get('title') or '')" 2>/dev/null)
-                LAST_MESSAGE=$(echo "$INFO_JSON" | python -c "import sys,json; print(json.load(sys.stdin).get('last_message') or '')" 2>/dev/null)
-                break
-            fi
+    if [ -f "$HELPER_SCRIPT" ]; then
+        INFO_JSON=$($PYTHON_BIN "$HELPER_SCRIPT" "$SESSION_ID" 2>/dev/null)
+        if [ -n "$INFO_JSON" ]; then
+            IS_SUBAGENT=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(str(json.load(sys.stdin).get('is_subagent', False)).lower())" 2>/dev/null || echo "false")
+            SESSION_TITLE=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(json.load(sys.stdin).get('title') or '')" 2>/dev/null)
+            LAST_MESSAGE=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(json.load(sys.stdin).get('last_message') or '')" 2>/dev/null)
         fi
-    done
+    fi
+fi
+
+# Skip alerts for subagent sessions — only the parent session should notify.
+if [ "$IS_SUBAGENT" = "true" ]; then
+    exit 0
 fi
 
 # ── Derive repo (org/repo) from git remote ──────────────────────────────────
@@ -135,7 +142,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
 SESSION_URL="${DEVIN_SESSION_URL:-}"
 
 # ── Build JSON payload (using python for safe escaping) ──────────────────────
-PAYLOAD=$(python -c "
+PAYLOAD=$($PYTHON_BIN -c "
 import json, sys
 print(json.dumps({
     'taskDescription': sys.argv[1],
