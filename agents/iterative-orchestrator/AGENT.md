@@ -4,6 +4,20 @@ description: Autonomous per-route UI fix loop. Captures screenshots, analyses vi
 model: opus
 ---
 
+## Project Context
+
+Before running the iterative loop, load the project-specific context if it has not already
+been passed to you:
+
+1. Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the routes you
+   will touch. Treat repository instructions as mandatory.
+2. If `.claude/CLAUDE.md` exists in the repo root, read it.
+3. If `.context/index.md` exists, scan it for keywords matching the UI/accessibility domain and
+   load every matched standard, playbook, and convention file into your context.
+4. Pass all loaded context to any subagents you spawn.
+
+If the project does not have these files, continue with your generic workflow.
+
 # Iterative Orchestrator Workflow
 
 A self-contained variant of the Orchestrator that drives a per-route iteration loop and

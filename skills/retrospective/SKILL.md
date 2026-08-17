@@ -16,6 +16,15 @@ Run this after completing a significant task, fixing a non-trivial bug, or finis
 
 ---
 
+## Step 0: Load Project Context
+
+Before reconstructing the session, load the project-specific context:
+1. Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the paths involved.
+   Treat repository instructions as mandatory.
+2. If `.claude/CLAUDE.md` exists in the repo root, read it.
+3. If `.context/index.md` exists, scan it for keywords matching the work's domain and load
+   every matched standard, playbook, and convention file into your context.
+
 ## Step 1: Reconstruct What Happened
 
 Gather evidence from the current session:

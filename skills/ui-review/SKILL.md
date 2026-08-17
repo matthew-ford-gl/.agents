@@ -16,9 +16,18 @@ Requires a `.claude/ui-review.json` config file in the repo root.
 
 ---
 
+## Phase 0: Load Project Context
+
+Before reading the UI-review config, load the project-specific context:
+1. Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the routes you
+   will review. Treat repository instructions as mandatory.
+2. If `.claude/CLAUDE.md` exists in the repo root, read it.
+3. If `.context/index.md` exists, scan it for keywords matching the UI/accessibility domain and
+   load every matched standard, playbook, and convention file into your context.
+
 ## Configuration
 
-Read `.claude/ui-review.json` from the repo root before doing anything else. If it is absent, stop and print:
+Read `.claude/ui-review.json` from the repo root. If it is absent, stop and print:
 
 ```
 ❌  No .claude/ui-review.json found. Create one to configure this command.

@@ -14,6 +14,21 @@ Runs three parallel planning analysts → synthesises an initial implementation 
 
 ---
 
+## Phase 0: Load Project Context
+
+Before interpreting the task, load the project-specific context so the whole pipeline
+uses the right branch rules, validation gates, and domain standards:
+
+1. Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the paths you
+   will touch. Treat repository instructions as mandatory throughout planning and execution.
+2. If `.claude/CLAUDE.md` exists in the repo root, read it.
+3. If `.context/index.md` exists, scan it for keywords matching the task domain and load
+   every matched standard, playbook, and convention file into your context.
+
+Pass all loaded context to every agent you spawn in later phases.
+
+---
+
 ## Phase A: Understand the Task
 
 Read `$ARGUMENTS` to extract:
