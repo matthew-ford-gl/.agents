@@ -16,13 +16,19 @@ Never write ROOT-CAUSE.md from code reading alone. Every hypothesis must be conf
 
 ## Phase 0: Context Loading
 
-Before touching any code, check for existing knowledge:
-- Read root `CLAUDE.md` for known gotchas relevant to the affected area
+Before touching any code, load project context and check for existing knowledge:
+- Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the affected paths.
+  Treat repository instructions as mandatory throughout the investigation.
+- If `.claude/CLAUDE.md` exists in the repo root, read it.
+- If `.context/index.md` exists, scan it for keywords matching the bug domain and load every
+  matched standard, playbook, and convention file into your context.
 - Look for any `docs/` or `bugs/` directory with documented past incidents
 - Look for `known-bugs.md`, `known-issues.md`, or similar files in the affected service's directory
 - Check `git log --oneline -20` to understand recent changes that may have introduced the bug
 
 If a prior documented incident matches this symptom, confirm it applies before re-investigating from scratch.
+
+Pass all loaded project context to any agents you spawn.
 
 ---
 

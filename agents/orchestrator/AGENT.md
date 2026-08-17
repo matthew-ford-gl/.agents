@@ -86,9 +86,14 @@ Detect which runtime you are in and use its native mechanism for parallel review
 
 ## Steps
 
-0. Before anything else, run: `pwsh -Command "Sync-AgentContext -TargetRepo (Get-Location)"`.
-   This pulls the latest standards and playbooks from the central clone.
-   If it fails, warn the human but continue -- the existing .context/ files are still usable.
+0. Load the project-level ground rules before doing anything else:
+
+   - Read the repository root `AGENTS.md`. Treat its instructions as mandatory for branch
+     strategy, versioning, validation, and PR targeting.
+   - If `.claude/CLAUDE.md` exists in the repo root, read it.
+   - If PowerShell and `Sync-AgentContext` are available, also run:
+     `pwsh -Command "Sync-AgentContext -TargetRepo (Get-Location)"`.
+     If it fails or is unavailable, continue with the checked-in `.context/` files.
 
 1. Read relevant source files. Understand scope. While reading, set detection flags:
 
@@ -105,9 +110,14 @@ Detect which runtime you are in and use its native mechanism for parallel review
    - Plan includes migrations, schema changes, or repository layer writes?
      → RUN_MIGRATION
 
-2. If `.context/index.md` exists, scan it for keywords matching the task domain.
-   Load every matched standard and playbook file into your context now.
-   Pass this loaded context to all sub-agents in steps 3 and 7.
+2. Load domain-specific project context. After identifying affected paths:
+
+   - Check for any nearer `AGENTS.md` files in or above the affected paths and read them.
+     Treat them as mandatory when present.
+   - If `.context/index.md` exists, scan it for keywords matching the task domain. Load
+     every matched standard, playbook, and convention file into your context now.
+
+   Pass all loaded context to all sub-agents in steps 3 and 7.
 
 3. Produce a plan: files to change, why, risks, test strategy.
    STOP and wait for human approval before continuing.
@@ -160,17 +170,22 @@ Detect which runtime you are in and use its native mechanism for parallel review
 5. Consolidate feedback. If any agent returns BLOCKED, present the reason and STOP for
    human input. Incorporate all non-blocking feedback into the implementation approach.
 
-6. Implement the changes, addressing all reviewer feedback.
+6. Before editing, verify the current branch complies with `AGENTS.md`. Never implement
+   directly on a protected or integration branch. Create the required task branch from the
+   mandated base if the current branch is unsuitable. Then implement the changes, addressing
+   all reviewer feedback.
 
 7a. **Reproduce the full CI gate locally — do not proceed with a red gate.**
     The CI file is the single source of truth; never maintain or consult a
     copied list of gates (it will drift). Resolve the gate in this order:
 
-    1. If CLAUDE.md names a single local-CI command (e.g. `npm run verify`,
-       `make verify`), run that. It is assumed to call the same commands CI
-       calls, so it is authoritative.
+    1. If `AGENTS.md` or `.claude/CLAUDE.md` names mandatory validation commands
+       or a single local-CI command (e.g. `npm run verify`, `make verify`), run
+       those commands in the documented order. Run any documented safe autofix
+       command before the final read-only lint gate.
     2. Otherwise, locate the CI definition itself — check in order:
-       `.github/workflows/*.yml`, `.github/workflows/*.yaml`, `azure-pipelines.yml`, `.gitlab-ci.yml`,
+       `.github/workflows/*.yml`, `.github/workflows/*.yaml`, `pipelines/**/*.yml`,
+       `pipelines/**/*.yaml`, `azure-pipelines.yml`, `.gitlab-ci.yml`,
        `bitbucket-pipelines.yml`. Read every job. Extract every shell command
        each job runs (including those in `steps[*].run`, `scripts`, Makefile
        targets, etc.) and run them all locally in the same order CI would.
@@ -184,7 +199,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
     4. Any failure → fix it and re-run from the top of 7a. Do not advance to
        step 7b or 8 until the full gate is green (or explicitly noted in 3).
 
-    If no CI file exists and CLAUDE.md names no command, ask the human.
+    If no CI file or repository instruction names validation commands, ask the human.
 
 7b. Generate the diff (`git diff` against the base branch). Collect all test files touched
     or created. Run `qa-gatekeeper` as a Task in implementation-review mode, passing:
@@ -222,9 +237,15 @@ Detect which runtime you are in and use its native mechanism for parallel review
    If any reviewer returns BLOCKED or lists MUST-FIX items, address them and loop back to
    step 7a. Should-fix and nit items are reported to the human but do not block.
 
-9. Create a PR for the changes.
+9. Before creating a PR, compare the final diff with the base branch and apply every
+   version or deployment-metadata update required by `AGENTS.md`. Re-run the full gate
+   after any such update.
+
+   Create a PR for the changes.
    - Detect remote type.
    - Create branch, commit, push, raise PR.
+   - Use the target branch mandated by `AGENTS.md`; never target a prohibited production
+     branch.
    - PR description must include:
      - Summary of changes in a short paragraph
      - List of main files changed and why

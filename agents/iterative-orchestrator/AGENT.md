@@ -4,6 +4,20 @@ description: Autonomous per-route UI fix loop. Captures screenshots, analyses vi
 model: opus
 ---
 
+## Project Context
+
+Before running the iterative loop, load the project-specific context if it has not already
+been passed to you:
+
+1. Read the repository root `AGENTS.md` and any nearer `AGENTS.md` files for the routes you
+   will touch. Treat repository instructions as mandatory.
+2. If `.claude/CLAUDE.md` exists in the repo root, read it.
+3. If `.context/index.md` exists, scan it for keywords matching the UI/accessibility domain and
+   load every matched standard, playbook, and convention file into your context.
+4. Pass all loaded context to any subagents you spawn.
+
+If the project does not have these files, continue with your generic workflow.
+
 # Iterative Orchestrator Workflow
 
 A self-contained variant of the Orchestrator that drives a per-route iteration loop and
@@ -117,9 +131,11 @@ reservations → transaction-history → release-notes
 
 Run these once when a run starts (fresh state, or `all`), not per route.
 
-**S0. Sync context.** Run: `pwsh -Command "Sync-AgentContext -TargetRepo (Get-Location)"`.
-Pulls the latest standards and playbooks from the central clone. If it fails, warn and
-continue -- the existing `.context/` files are still usable.
+**S0. Sync context.** If PowerShell and `Sync-AgentContext` are available, run:
+`pwsh -Command "Sync-AgentContext -TargetRepo (Get-Location)"`.
+This pulls the latest standards and playbooks from the central clone. If PowerShell or
+`Sync-AgentContext` is unavailable, or if the command fails, warn and continue -- the
+existing `.context/` files are still usable.
 
 **S1. Parse arguments and init state.**
 - `all` → delete `.ux-fix-state.json` if present, then proceed as fresh.
