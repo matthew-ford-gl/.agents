@@ -170,7 +170,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
        `make verify`), run that. It is assumed to call the same commands CI
        calls, so it is authoritative.
     2. Otherwise, locate the CI definition itself — check in order:
-       `.github/workflows/*.yml`, `azure-pipelines.yml`, `.gitlab-ci.yml`,
+       `.github/workflows/*.yml`, `.github/workflows/*.yaml`, `azure-pipelines.yml`, `.gitlab-ci.yml`,
        `bitbucket-pipelines.yml`. Read every job. Extract every shell command
        each job runs (including those in `steps[*].run`, `scripts`, Makefile
        targets, etc.) and run them all locally in the same order CI would.
