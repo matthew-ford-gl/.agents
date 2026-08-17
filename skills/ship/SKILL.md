@@ -18,5 +18,4 @@ Before doing anything else:
    `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
    `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`; use the first that exists
 
-Then execute the workflow. Pass all loaded project context to the orchestrator and any
-other agents you spawn.
+Then execute the workflow. Pass all loaded project context to any agents you spawn.
