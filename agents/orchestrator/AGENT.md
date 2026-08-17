@@ -184,14 +184,15 @@ Detect which runtime you are in and use its native mechanism for parallel review
        those commands in the documented order. Run any documented safe autofix
        command before the final read-only lint gate.
     2. Otherwise, locate the CI definition itself — check in order:
-       `.github/workflows/*.yml`, `pipelines/**/*.yml`, `pipelines/**/*.yaml`,
-       `azure-pipelines.yml`, `.gitlab-ci.yml`, `bitbucket-pipelines.yml`. Read
-       every job. Extract every shell command each job runs (including those in
-       `steps[*].run`, `scripts`, Makefile targets, etc.) and run them all locally
-       in the same order CI would. This explicitly covers every gate type: build,
-       lint, format/style checks, dead-code / unused-dependency checks (e.g. knip,
-       depcheck, ts-prune, `noUnusedLocals`), type-checks, unit tests, and E2E
-       suites. None are implicitly skipped because they weren't in a short list.
+       `.github/workflows/*.yml`, `.github/workflows/*.yaml`, `pipelines/**/*.yml`,
+       `pipelines/**/*.yaml`, `azure-pipelines.yml`, `.gitlab-ci.yml`,
+       `bitbucket-pipelines.yml`. Read every job. Extract every shell command
+       each job runs (including those in `steps[*].run`, `scripts`, Makefile
+       targets, etc.) and run them all locally in the same order CI would.
+       This explicitly covers every gate type: build, lint, format/style checks,
+       dead-code / unused-dependency checks (e.g. knip, depcheck, ts-prune,
+       `noUnusedLocals`), type-checks, unit tests, and E2E suites. None are
+       implicitly skipped because they weren't in a short list.
     3. If a gate cannot run locally (e.g. E2E needs services), start the
        required services if you can; otherwise record exactly which gate was
        not run and why in the PR "Notes". Never silently skip a gate.
