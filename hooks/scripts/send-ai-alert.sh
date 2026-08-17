@@ -7,6 +7,11 @@
 # determine whether the current session is a subagent. Subagent completions
 # are skipped so only the parent session triggers an Echo alert.
 
+# ── Version ──────────────────────────────────────────────────────────────────
+# Bump this whenever the script's alerting behavior changes, so alerts in
+# flight can be traced back to the version that emitted them.
+SCRIPT_VERSION="1.6.0"
+
 # ── Configuration ────────────────────────────────────────────────────────────
 API_BASE="${ECHO_ALERT_API_BASE:-https://echo.uk.hos.accessacloud.com}"
 API_KEY="${ECHO_ALERT_API_KEY:-}"
@@ -54,12 +59,14 @@ SESSION_ID=$(json_val "session_id" "")
 SESSION_TITLE=""
 LAST_MESSAGE=""
 IS_SUBAGENT="false"
+HAS_PENDING_SUBAGENTS="false"
 if [ -n "$SESSION_ID" ] && [ -n "$PYTHON_BIN" ]; then
     HELPER_SCRIPT="$(dirname "$0")/session-info.py"
     if [ -f "$HELPER_SCRIPT" ]; then
         INFO_JSON=$($PYTHON_BIN "$HELPER_SCRIPT" "$SESSION_ID" 2>/dev/null)
         if [ -n "$INFO_JSON" ]; then
             IS_SUBAGENT=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(str(json.load(sys.stdin).get('is_subagent', False)).lower())" 2>/dev/null || echo "false")
+            HAS_PENDING_SUBAGENTS=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(str(json.load(sys.stdin).get('has_pending_subagents', False)).lower())" 2>/dev/null || echo "false")
             SESSION_TITLE=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(json.load(sys.stdin).get('title') or '')" 2>/dev/null)
             LAST_MESSAGE=$(echo "$INFO_JSON" | $PYTHON_BIN -c "import sys,json; print(json.load(sys.stdin).get('last_message') or '')" 2>/dev/null)
         fi
@@ -69,6 +76,31 @@ fi
 # Skip alerts for subagent sessions — only the parent session should notify.
 if [ "$IS_SUBAGENT" = "true" ]; then
     exit 0
+fi
+
+# Skip Stop alerts while subagents (background or foreground) are still
+# running — the orchestrator will auto-resume on its own, so this isn't
+# really "waiting for user input". SessionEnd/Notification events still
+# alert regardless.
+if [ "$EVENT_NAME" = "Stop" ] && [ "$HAS_PENDING_SUBAGENTS" = "true" ]; then
+    exit 0
+fi
+
+# ── Dedupe identical back-to-back alerts ─────────────────────────────────────
+# Long-running autonomous tasks (e.g. the ship/quality-audit skills) can end
+# their turn more than once with no real progress — same session, same
+# event, same last message — before anything has actually changed (e.g.
+# waiting out a backend retry/rate-limit). Skip an exact repeat of the same
+# alert within a short cooldown window. Best-effort: any failure here should
+# not block a genuinely new alert, so it defaults to "send".
+DEDUPE_SCRIPT="$(dirname "$0")/alert-dedupe.py"
+if [ -f "$DEDUPE_SCRIPT" ] && [ -n "$PYTHON_BIN" ]; then
+    LAST_MESSAGE_FOR_KEY=$(echo "$LAST_MESSAGE" | cut -c1-300)
+    DEDUPE_KEY="${SESSION_ID}|${EVENT_NAME}|${LAST_MESSAGE_FOR_KEY}"
+    DEDUPE_RESULT=$($PYTHON_BIN "$DEDUPE_SCRIPT" "$DEDUPE_KEY" 300 2>/dev/null)
+    if [ "$DEDUPE_RESULT" = "skip" ]; then
+        exit 0
+    fi
 fi
 
 # ── Derive repo (org/repo) from git remote ──────────────────────────────────
@@ -139,6 +171,19 @@ if [ -n "$LAST_MESSAGE" ]; then
 
 Last message: ${TRUNCATED}"
 fi
+
+# Tag the reason with the emitting script's version, so alerts can be traced
+# back to the script version that sent them.
+# Include the emitting session's own ID (there's no separate "parent session
+# id" recorded in sessions.db for subagents to link back to -- isolation is
+# done purely via the is_subagent/has_pending_subagents content heuristics
+# above) so a misfire can be traced straight back to the exact session via
+# `python session-info.py <SESSION_ID>` without needing to guess.
+SESSION_ID_SUFFIX=""
+if [ -n "$SESSION_ID" ]; then
+    SESSION_ID_SUFFIX=" | Session: ${SESSION_ID}"
+fi
+REASON="[send-ai-alert.sh v${SCRIPT_VERSION}] ${REASON}${SESSION_ID_SUFFIX}"
 
 # ── Timestamp ────────────────────────────────────────────────────────────────
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "")
