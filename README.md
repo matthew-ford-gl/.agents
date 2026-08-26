@@ -31,6 +31,7 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet | read-only |
 | `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe | read-only |
 | `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe | read-only |
+| `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet | read-only + exec |
 | `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe | read/edit/write/exec |
 
 ### Tool Access
@@ -42,8 +43,8 @@ the runtime rather than left to convention:
 - **read-only** — `read`, `grep`, `glob`. Covers every review/discussion persona: the
   orchestrator passes plan and file *content* directly into their prompt (never just paths),
   so these agents reason over what they're given and can't edit or run shell commands.
-- **read-only + exec** — adds `exec`, used only by `historian`, which runs `git log` itself to
-  find historical patterns.
+- **read-only + exec** — adds `exec`, used by `historian` for historical analysis and
+  `repo-investigator` for non-mutating history, test, and static-analysis verification.
 - **read-only + web_search** — adds `web_search`, used by `security-analyst` and
   `dependency-reviewer` for live CVE/advisory lookups.
 - **unrestricted** — `orchestrator` and `iterative-orchestrator` have no `allowed-tools` field
@@ -65,6 +66,7 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 | `/analyse-bug` | `<bug description>` | Structured root cause analysis pipeline. Correlates live data, ranks hypotheses, runs a multi-persona discussion, and writes `ROOT-CAUSE.md` only after live-data confirmation. |
 | `/verify-fix` | `<ROOT-CAUSE.md> [--diff <diff>]` | Post-implementation verification. Confirms the root cause is addressed, checks for partial fixes, and detects regressions. |
 | `/review-plans` | `<plan file>` | Adversarial review. Two agents independently attack the plan for fatal flaws and feasibility gaps against the actual codebase. |
+| `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |
 | `/ui-review` | `[route or all]` | Screenshot-driven UX review. Configured via `.claude/ui-review.json`; captures, analyses, fixes, and re-verifies each route. |
 | `/retrospective` | `[task name / PR / bug]` | Post-task knowledge extraction. Reconstructs the session, routes reusable learnings to `bugs/`, `docs/`, `CLAUDE.md`, or `~/.claude/CLAUDE.md`, and proposes process improvements. |
@@ -138,11 +140,13 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── performance-reviewer/
 │   ├── pragmatist/
 │   ├── qa-gatekeeper/
+│   ├── repo-investigator/
 │   ├── security-analyst/
 │   ├── senior-engineer/
 │   └── user-advocate/
 ├── skills/
 │   ├── analyse-bug/
+│   ├── investigate-repo/
 │   ├── iterate/
 │   ├── plan-task/
 │   ├── retrospective/
