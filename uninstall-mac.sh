@@ -41,7 +41,7 @@ if [[ -d "$AGENTS_SOURCE" ]]; then
 
         if [[ "$WITH_CLAUDE" == true ]]; then
             claude_link="$TARGET_DIR/.claude/agents/$agent_name.md"
-            if [[ -L "$claude_link" ]]; then
+            if [[ -e "$claude_link" || -L "$claude_link" ]]; then
                 rm -f "$claude_link"
                 echo "Removed Claude agent: $agent_name"
             fi
@@ -64,7 +64,7 @@ if [[ -d "$SKILLS_SOURCE" ]]; then
 
         if [[ "$WITH_CLAUDE" == true ]]; then
             claude_link="$TARGET_DIR/.claude/skills/$skill_name"
-            if [[ -L "$claude_link" ]]; then
+            if [[ -e "$claude_link" || -L "$claude_link" ]]; then
                 rm -rf "$claude_link"
                 echo "Removed Claude skill: $skill_name"
             fi

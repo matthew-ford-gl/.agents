@@ -17,16 +17,63 @@ $devinRoot = Join-Path $UserRoot 'AppData\Roaming\devin'
 
 function Remove-Safe {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if (-not $item) { return }
 
-    $item = Get-Item -LiteralPath $Path
-    if ($item.PSIsContainer) {
-        # .NET Directory.Delete removes a directory reparse point (symlink/junction)
-        # without recursing into the target. For real directories it recurses.
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        if ($item.PSIsContainer) {
+            [System.IO.Directory]::Delete($Path, $false)
+        } else {
+            [System.IO.File]::Delete($Path)
+        }
+    } elseif ($item.PSIsContainer) {
         [System.IO.Directory]::Delete($Path, $true)
     } else {
         [System.IO.File]::Delete($Path)
     }
+}
+
+function ConvertTo-ClaudeDefinition {
+    param([string]$Content, [string]$SourcePath)
+
+    $modelMap = @{
+        opus   = 'opus'
+        sonnet = 'sonnet'
+        swe    = 'haiku'
+    }
+    $frontmatter = [regex]::Match($Content, '\A---\r?\n(?<body>.*?)\r?\n---(?=\r?\n)', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    if (-not $frontmatter.Success) {
+        return $Content
+    }
+
+    $modelMatches = [regex]::Matches($frontmatter.Groups['body'].Value, '(?m)^model:[ \t]*(?<model>[A-Za-z0-9_-]+)[ \t]*\r?$')
+    if ($modelMatches.Count -eq 0) {
+        return $Content
+    }
+    if ($modelMatches.Count -gt 1) {
+        throw "Expected at most one model declaration in $SourcePath, found $($modelMatches.Count)"
+    }
+
+    $sourceModel = $modelMatches[0].Groups['model'].Value
+    if (-not $modelMap.ContainsKey($sourceModel)) {
+        throw "No Claude Code model mapping for '$sourceModel' in $SourcePath"
+    }
+    $carriageReturn = if ($modelMatches[0].Value.EndsWith("`r")) { "`r" } else { '' }
+
+    $renderedFrontmatter = [regex]::Replace(
+        $frontmatter.Value,
+        '(?m)^model:[ \t]*[A-Za-z0-9_-]+[ \t]*\r?$',
+        "model: $($modelMap[$sourceModel])$carriageReturn"
+    )
+    return $renderedFrontmatter + $Content.Substring($frontmatter.Length)
+}
+
+function Write-ClaudeDefinition {
+    param([string]$SourcePath, [string]$DestinationPath)
+
+    $content = [System.IO.File]::ReadAllText($SourcePath)
+    $rendered = ConvertTo-ClaudeDefinition -Content $content -SourcePath $SourcePath
+    [System.IO.File]::WriteAllText($DestinationPath, $rendered, [System.Text.UTF8Encoding]::new($false))
 }
 
 function Install-Agents {
@@ -55,8 +102,8 @@ function Install-Agents {
         if ($claudePresent) {
             $claudeFile = Join-Path $claudeAgentsDir "$name.md"
             Remove-Safe -Path $claudeFile
-            New-Item -ItemType SymbolicLink -Path $claudeFile -Target $sourceFile | Out-Null
-            Write-Host "Linked Claude agent: $name"
+            Write-ClaudeDefinition -SourcePath $sourceFile -DestinationPath $claudeFile
+            Write-Host "Rendered Claude agent: $name"
         }
 
         if ($devinPresent) {
@@ -92,10 +139,11 @@ function Install-Skills {
         }
 
         if ($claudePresent) {
-            $claudeLink = Join-Path $claudeSkillsDir $name
-            Remove-Safe -Path $claudeLink
-            New-Item -ItemType SymbolicLink -Path $claudeLink -Target $sourceFolder | Out-Null
-            Write-Host "Linked Claude skill: $name"
+            $claudeFolder = Join-Path $claudeSkillsDir $name
+            Remove-Safe -Path $claudeFolder
+            Copy-Item -LiteralPath $sourceFolder -Destination $claudeFolder -Recurse
+            Write-ClaudeDefinition -SourcePath $sourceFile -DestinationPath (Join-Path $claudeFolder 'SKILL.md')
+            Write-Host "Rendered Claude skill: $name"
         }
 
         if ($devinPresent) {
@@ -117,7 +165,7 @@ function Install-Hooks {
         New-Item -ItemType SymbolicLink -Path $claudeSettingsLocal -Target $canonicalHooksFile -ErrorAction Stop | Out-Null
         Write-Host "Linked hooks: settings.local.json (symlink)"
     } catch {
-        New-Item -ItemType HardLink -Path $claudeSettingsLocal -Target $canonicalHooksFile | Out-Null
+        New-Item -ItemType HardLink -Path $claudeSettingsLocal -Value $canonicalHooksFile | Out-Null
         Write-Host "Linked hooks: settings.local.json (hardlink)"
     }
 }
@@ -137,18 +185,21 @@ Install-Agents
 Install-Skills
 Install-Hooks
 
-function Test-Link {
-    param([string]$Path, [string]$ExpectedTarget)
-    if (-not (Test-Path $Path)) {
-        return "$Path is missing"
+function Test-ClaudeDefinition {
+    param([string]$SourcePath, [string]$InstalledPath)
+    if (-not (Test-Path $InstalledPath -PathType Leaf)) {
+        return "$InstalledPath is missing"
     }
-    $item = Get-Item -LiteralPath $Path
-    if (-not $item.Target) {
-        return "$Path is not a symlink/junction"
+    $item = Get-Item -LiteralPath $InstalledPath
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        return "$InstalledPath is still a symlink"
     }
-    $actual = $item.Target | Select-Object -First 1
-    if ($actual -ne $ExpectedTarget) {
-        return "$Path points to $actual, expected $ExpectedTarget"
+
+    $source = [System.IO.File]::ReadAllText($SourcePath)
+    $expected = ConvertTo-ClaudeDefinition -Content $source -SourcePath $SourcePath
+    $actual = [System.IO.File]::ReadAllText($InstalledPath)
+    if ($actual -cne $expected) {
+        return "$InstalledPath does not match the rendered source definition"
     }
     return $null
 }
@@ -175,7 +226,7 @@ function Test-Install {
             if (-not (Test-Path $sourceFile)) { continue }
 
             if (Test-Path $claudeRoot) {
-                $failure = Test-Link -Path $claudeFile -ExpectedTarget $sourceFile
+                $failure = Test-ClaudeDefinition -SourcePath $sourceFile -InstalledPath $claudeFile
                 if ($failure) { $failures.Add($failure) }
             }
 
@@ -194,13 +245,19 @@ function Test-Install {
             $name = $skillDir.Name
             $sourceFolder = $skillDir.FullName
             $sourceFile = Join-Path $sourceFolder 'SKILL.md'
-            $claudeLink = Join-Path $claudeSkillsDir $name
+            $claudeFolder = Join-Path $claudeSkillsDir $name
+            $claudeFile = Join-Path $claudeFolder 'SKILL.md'
 
             if (-not (Test-Path $sourceFile)) { continue }
 
             if (Test-Path $claudeRoot) {
-                $failure = Test-Link -Path $claudeLink -ExpectedTarget $sourceFolder
-                if ($failure) { $failures.Add($failure) }
+                $folderItem = Get-Item -LiteralPath $claudeFolder -ErrorAction SilentlyContinue
+                if (-not $folderItem -or ($folderItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                    $failures.Add("$claudeFolder is missing or still a symlink")
+                } else {
+                    $failure = Test-ClaudeDefinition -SourcePath $sourceFile -InstalledPath $claudeFile
+                    if ($failure) { $failures.Add($failure) }
+                }
             }
 
             if (Test-Path $devinRoot) {
@@ -241,7 +298,7 @@ function Test-Install {
         throw "Install verification failed:`n$($failures -join "`n")"
     }
 
-    Write-Host "Install verified: all Claude links are correct and no stale Devin copies remain."
+    Write-Host "Install verified: all Claude definitions are rendered correctly and no stale Devin copies remain."
 }
 
 Test-Install
