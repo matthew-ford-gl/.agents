@@ -17,9 +17,9 @@ $devinRoot = Join-Path $UserRoot 'AppData\Roaming\devin'
 
 function Remove-LinkIfExists {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if (-not $item) { return }
 
-    $item = Get-Item -LiteralPath $Path
     if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
         # Only remove reparse points (symbolic links, junctions, etc.), never real files.
         if ($item.PSIsContainer) {
@@ -33,17 +33,36 @@ function Remove-LinkIfExists {
 
 function Remove-Safe {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if (-not $item) { return }
 
-    $item = Get-Item -LiteralPath $Path
-    if ($item.PSIsContainer) {
-        # .NET Directory.Delete removes a directory reparse point (symlink/junction)
-        # without recursing into the target. For real directories it recurses.
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        if ($item.PSIsContainer) {
+            [System.IO.Directory]::Delete($Path, $false)
+        } else {
+            [System.IO.File]::Delete($Path)
+        }
+    } elseif ($item.PSIsContainer) {
         [System.IO.Directory]::Delete($Path, $true)
     } else {
         [System.IO.File]::Delete($Path)
     }
     Write-Host "Removed: $Path"
+}
+
+function Remove-HookIfManaged {
+    param([string]$Path)
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if (-not $item) { return }
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        Remove-LinkIfExists -Path $Path
+        return
+    }
+    if ((Test-Path $canonicalHooksFile -PathType Leaf) -and
+        ([System.IO.File]::ReadAllText($Path) -ceq [System.IO.File]::ReadAllText($canonicalHooksFile))) {
+        [System.IO.File]::Delete($Path)
+        Write-Host "Removed: $Path"
+    }
 }
 
 if (-not (Test-Path $UserRoot)) {
@@ -57,20 +76,20 @@ if (Test-Path $claudeRoot) {
     if (Test-Path $canonicalAgentsRoot) {
         foreach ($agentDir in Get-ChildItem -Directory -Path $canonicalAgentsRoot | Sort-Object Name) {
             $claudeFile = Join-Path $claudeAgentsDir "$($agentDir.Name).md"
-            Remove-LinkIfExists -Path $claudeFile
+            Remove-Safe -Path $claudeFile
         }
     }
 
     if (Test-Path $canonicalSkillsRoot) {
         foreach ($skillDir in Get-ChildItem -Directory -Path $canonicalSkillsRoot | Sort-Object Name) {
             $claudeLink = Join-Path $claudeSkillsDir $skillDir.Name
-            Remove-LinkIfExists -Path $claudeLink
+            Remove-Safe -Path $claudeLink
         }
     }
 
-    # Remove hooks symlink
+    # Remove hooks artifact
     $claudeSettingsLocal = Join-Path $claudeRoot 'settings.local.json'
-    Remove-LinkIfExists -Path $claudeSettingsLocal
+    Remove-HookIfManaged -Path $claudeSettingsLocal
 } else {
     Write-Warning "Claude folder not found at $claudeRoot — nothing to remove"
 }

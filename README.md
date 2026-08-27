@@ -1,9 +1,9 @@
 # AI Agent & Skill Library
 
-A central repository of reusable agent definitions, command skills, and lifecycle hooks for Claude Code and Devin CLI. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts symlink agents, skills, and hooks into the directories where Claude Code and Devin CLI expect them.
+A central repository of reusable agent definitions, command skills, and lifecycle hooks for Claude Code and Devin CLI. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts render Claude-specific definitions, link Devin definitions where needed, and link shared hooks into the directories where each CLI expects them.
 
-- `install-windows.ps1` / `install-mac.sh` — creates symlinks for agents, skills, and hooks; removes stale Devin copies. Skips any component whose source does not exist.
-- `uninstall-windows.ps1` / `uninstall-mac.sh` — removes the symlinks created by the install script.
+- `install-windows.ps1` / `install-mac.sh` — renders Claude agents and skills with compatible models, creates Devin and hook symlinks where needed, and removes stale Devin copies. Skips any component whose source does not exist.
+- `uninstall-windows.ps1` / `uninstall-mac.sh` — removes the artifacts created by the install script.
 
 ---
 
@@ -11,28 +11,28 @@ A central repository of reusable agent definitions, command skills, and lifecycl
 
 Agents are discussion personas and reviewers that can be invoked by the orchestrator or by the `/ship`, `/plan-task`, `/iterate`, and `/ui-review` skills.
 
-| Agent | Stage | Role | Model | Tools |
-|-------|-------|------|-------|-------|
-| `orchestrator` | Workflow | Main execution workflow: plan, review, implement, test, and raise a PR. | opus | unrestricted |
-| `iterative-orchestrator` | Workflow | Autonomous per-route UI fix loop: capture, analyse, fix, re-verify, and raise a single PR. | opus | unrestricted |
-| `director` | Discussion | Binding decision maker. Synthesises all debate positions into `DECISION.md` with `PROCEED` / `PROCEED WITH MODIFICATIONS` / `DEFER` / `REJECT`. | opus | read-only |
-| `senior-engineer` | Plan | Validates implementation plans against engineering standards (architecture, code quality, API design, performance, resilience, observability, testing). | sonnet | read-only |
-| `qa-gatekeeper` | Plan & Diff | Dual-mode QA reviewer: plan mode checks testability, implementation mode checks committed tests against the test strategy. | swe | read-only |
-| `security-analyst` | Plan & Diff | Two-pass threat model (STRIDE) and standards compliance covering OWASP, GDPR, PCI-DSS, business logic, abuse, and supply chain. | sonnet | read-only + web_search |
-| `guardian` | Discussion | Principal Engineer production-safety persona. Holds the Safety Veto for data loss, security breach, and payment corruption. | sonnet | read-only |
-| `pragmatist` | Discussion | Complexity challenger and MVP champion. Pushes for the minimum shippable slice and probability-grounded risk estimates. | sonnet | read-only |
-| `craftsman` | Discussion | Code-quality and test-first champion. Owns the Test-First Strategy table and enforces SOLID. | sonnet | read-only |
-| `architect` | Discussion | Principal Architect. Reviews service boundaries, data ownership, coupling, abstraction correctness, and evolution risk. | sonnet | read-only |
-| `user-advocate` | Discussion | End-user perspective. Traces user journeys, edge cases, and accidental complexity in the UX. | sonnet | read-only |
-| `historian` | Discussion | Institutional memory guardian. Cross-references plans against git history, past incidents, and documented patterns. | sonnet | read-only + exec |
-| `code-reviewer` | Diff | Reviews the concrete diff against the approved plan for bugs, plan-drift, and standard violations. | swe | read-only |
-| `accessibility-reviewer` | Plan & Diff | Conditional reviewer for UI changes. Checks WCAG 2.2 Level AA, keyboard operability, ARIA, and touch targets. | swe | read-only |
-| `dependency-reviewer` | Plan & Diff | Conditional reviewer for package changes. Checks supply chain, maintenance, license, necessity, transitive deps, and CVEs. | swe | read-only + web_search |
-| `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet | read-only |
-| `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe | read-only |
-| `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe | read-only |
-| `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet | read-only + exec |
-| `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe | read/edit/write/exec |
+| Agent | Stage | Role | Devin / Claude model | Tools |
+|-------|-------|------|----------------------|-------|
+| `orchestrator` | Workflow | Main execution workflow: plan, review, implement, test, and raise a PR. | opus / opus | unrestricted |
+| `iterative-orchestrator` | Workflow | Autonomous per-route UI fix loop: capture, analyse, fix, re-verify, and raise a single PR. | opus / opus | unrestricted |
+| `director` | Discussion | Binding decision maker. Synthesises all debate positions into `DECISION.md` with `PROCEED` / `PROCEED WITH MODIFICATIONS` / `DEFER` / `REJECT`. | opus / opus | read-only |
+| `senior-engineer` | Plan | Validates implementation plans against engineering standards (architecture, code quality, API design, performance, resilience, observability, testing). | sonnet / sonnet | read-only |
+| `qa-gatekeeper` | Plan & Diff | Dual-mode QA reviewer: plan mode checks testability, implementation mode checks committed tests against the test strategy. | swe / haiku | read-only |
+| `security-analyst` | Plan & Diff | Two-pass threat model (STRIDE) and standards compliance covering OWASP, GDPR, PCI-DSS, business logic, abuse, and supply chain. | sonnet / sonnet | read-only + web_search |
+| `guardian` | Discussion | Principal Engineer production-safety persona. Holds the Safety Veto for data loss, security breach, and payment corruption. | sonnet / sonnet | read-only |
+| `pragmatist` | Discussion | Complexity challenger and MVP champion. Pushes for the minimum shippable slice and probability-grounded risk estimates. | sonnet / sonnet | read-only |
+| `craftsman` | Discussion | Code-quality and test-first champion. Owns the Test-First Strategy table and enforces SOLID. | sonnet / sonnet | read-only |
+| `architect` | Discussion | Principal Architect. Reviews service boundaries, data ownership, coupling, abstraction correctness, and evolution risk. | sonnet / sonnet | read-only |
+| `user-advocate` | Discussion | End-user perspective. Traces user journeys, edge cases, and accidental complexity in the UX. | sonnet / sonnet | read-only |
+| `historian` | Discussion | Institutional memory guardian. Cross-references plans against git history, past incidents, and documented patterns. | sonnet / sonnet | read-only + exec |
+| `code-reviewer` | Diff | Reviews the concrete diff against the approved plan for bugs, plan-drift, and standard violations. | swe / haiku | read-only |
+| `accessibility-reviewer` | Plan & Diff | Conditional reviewer for UI changes. Checks WCAG 2.2 Level AA, keyboard operability, ARIA, and touch targets. | swe / haiku | read-only |
+| `dependency-reviewer` | Plan & Diff | Conditional reviewer for package changes. Checks supply chain, maintenance, license, necessity, transitive deps, and CVEs. | swe / haiku | read-only + web_search |
+| `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet / sonnet | read-only |
+| `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe / haiku | read-only |
+| `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe / haiku | read-only |
+| `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet / sonnet | read-only + exec |
+| `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe / haiku | read/edit/write/exec |
 
 ### Tool Access
 
@@ -187,19 +187,20 @@ This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `
 
    `install-mac.sh` does **not** auto-detect existing tool directories — it defaults to `--claude` only. Pass `--devin` explicitly to also install Devin symlinks, even if `.devin` already exists:
    ```bash
-   ./install-mac.sh --devin      # install Devin symlinks only
-   ./install-mac.sh --claude     # install Claude symlinks only (default)
+   ./install-mac.sh --devin      # install Devin agent/skill symlinks only
+   ./install-mac.sh --claude     # install rendered Claude definitions only (default)
    ./install-mac.sh --claude --devin
    ./install-mac.sh /path/to/project --claude --devin
    ```
 
    Both scripts also symlink `hooks/hooks.json` to `settings.local.json` in the Claude directory whenever `.claude` is present, regardless of which `--claude`/`--devin` flags you pass.
-2. Start a skill from inside the target project:
+2. Rerun the installer after changing a canonical agent or skill. Claude definitions are rendered copies rather than symlinks, so they do not update automatically.
+3. Start a skill from inside the target project:
    ```
    /plan-task "Add payment retry logic to the checkout service"
    /analyse-bug "Checkout intermittently returns 500 for duplicate requests"
    ```
-3. To remove the symlinks later, run the matching uninstall script:
+4. To remove the installed artifacts later, run the matching uninstall script:
 
    **Windows:**
    ```powershell
@@ -211,20 +212,20 @@ This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `
    ./uninstall-mac.sh
    ```
 
-   Both uninstallers remove the Claude and/or Devin agent/skill symlinks (per the same `--claude`/`--devin` flags as the installer) as well as the hooks symlink, which is always removed regardless of flags.
+   `uninstall-mac.sh` removes Claude and/or Devin artifacts according to the same `--claude`/`--devin` flags as the installer. `uninstall-windows.ps1` auto-detects both installations and takes no flags. Both uninstallers also remove the managed hooks artifact.
 
 ---
 
 ## Models
 
-Model names follow the Devin CLI short names (`opus`, `sonnet`, `swe`), since this repo targets
-Devin CLI directly (Devin reads `.agents/` in place; Claude Code compatibility is not currently
-in use). Each short name always resolves to the latest model in that family. Agent definitions
-specify a preferred model for each role:
+Canonical definitions use Devin CLI short names. The installers render a runtime-specific `model:` value for Claude Code while leaving the canonical Devin definition unchanged:
 
-- `opus` — large-model reasoning and decision-making (orchestrators, director, deep discussion personas).
-- `sonnet` — balanced reasoning for senior review, security, architecture, and discussion.
-- `swe` — fast, cost-efficient checks: focused diff/code review, dependency and observability checks, and accessibility.
+| Purpose | Devin CLI | Claude Code |
+|---------|-----------|-------------|
+| Deep reasoning and decisions | `opus` | `opus` |
+| Balanced senior review | `sonnet` | `sonnet` |
+| Fast, cost-efficient checks | `swe` | `haiku` |
 
-Avoid other model names (e.g. `haiku`, `codex`, `gemini`, full model IDs) in `model:` frontmatter
-unless you've confirmed they resolve correctly under Devin CLI — see `docs.devin.ai/cli/models`.
+`opus` and `sonnet` are shared aliases. `swe` is Devin-specific and maps to Claude Code's fast `haiku` tier. The mapping is explicit and installation fails for an unmapped model, so a new alias cannot silently produce an invalid Claude definition.
+
+Keep model names in canonical `model:` frontmatter valid for Devin CLI. When adding a model outside `opus`, `sonnet`, or `swe`, add and document its Claude mapping in both installers after confirming that each runtime supports the intended target.

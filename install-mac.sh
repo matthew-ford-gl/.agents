@@ -35,6 +35,52 @@ AGENTS_SOURCE="$SCRIPT_DIR/agents"
 SKILLS_SOURCE="$SCRIPT_DIR/skills"
 HOOKS_SOURCE="$SCRIPT_DIR/hooks/hooks.json"
 
+render_claude_definition() {
+    local source_file=$1
+    local destination_file=$2
+    local model_info model_count source_model claude_model
+
+    model_info=$(awk '
+        NR == 1 && $0 == "---" { in_frontmatter = 1; next }
+        in_frontmatter && $0 == "---" { in_frontmatter = 0; next }
+        in_frontmatter && /^model:[[:space:]]*[^[:space:]]+[[:space:]]*$/ {
+            count++
+            model = $0
+            sub(/^model:[[:space:]]*/, "", model)
+            sub(/[[:space:]]*$/, "", model)
+        }
+        END { printf "%d:%s", count, model }
+    ' "$source_file")
+    model_count=${model_info%%:*}
+    source_model=${model_info#*:}
+
+    if [[ "$model_count" == "0" ]]; then
+        cp "$source_file" "$destination_file"
+        return
+    fi
+    if [[ "$model_count" != "1" ]]; then
+        echo "Expected at most one model declaration in $source_file, found $model_count" >&2
+        return 1
+    fi
+
+    case "$source_model" in
+        opus) claude_model=opus ;;
+        sonnet) claude_model=sonnet ;;
+        swe) claude_model=haiku ;;
+        *)
+            echo "No Claude Code model mapping for '$source_model' in $source_file" >&2
+            return 1
+            ;;
+    esac
+
+    awk -v model="$claude_model" '
+        NR == 1 && $0 == "---" { in_frontmatter = 1; print; next }
+        in_frontmatter && $0 == "---" { in_frontmatter = 0; print; next }
+        in_frontmatter && /^model:[[:space:]]*[^[:space:]]+[[:space:]]*$/ { print "model: " model; next }
+        { print }
+    ' "$source_file" > "$destination_file"
+}
+
 echo "Installing agents and skills from $SCRIPT_DIR into $TARGET_DIR"
 
 if [[ "$WITH_CLAUDE" == true ]]; then
@@ -68,8 +114,8 @@ if [[ -d "$AGENTS_SOURCE" ]]; then
             if [[ -e "$claude_link" || -L "$claude_link" ]]; then
                 rm -f "$claude_link"
             fi
-            ln -s "$agent_file" "$claude_link"
-            echo "Linked Claude agent: $claude_link -> $agent_file"
+            render_claude_definition "$agent_file" "$claude_link"
+            echo "Rendered Claude agent: $claude_link"
         fi
 
         if [[ "$WITH_DEVIN" == true ]]; then
@@ -100,8 +146,9 @@ if [[ -d "$SKILLS_SOURCE" ]]; then
             if [[ -e "$claude_link" || -L "$claude_link" ]]; then
                 rm -rf "$claude_link"
             fi
-            ln -s "$skill_dir" "$claude_link"
-            echo "Linked Claude skill: $claude_link -> $skill_dir"
+            cp -R "$skill_dir" "$claude_link"
+            render_claude_definition "$skill_file" "$claude_link/SKILL.md"
+            echo "Rendered Claude skill: $claude_link"
         fi
 
         if [[ "$WITH_DEVIN" == true ]]; then
@@ -116,7 +163,7 @@ if [[ -d "$SKILLS_SOURCE" ]]; then
 fi
 
 # Hooks — symlink hooks.json to ~/.claude/settings.local.json
-if [[ -f "$HOOKS_SOURCE" ]]; then
+if [[ -f "$HOOKS_SOURCE" && -d "$TARGET_DIR/.claude" ]]; then
     CLAUDE_SETTINGS_LOCAL="$TARGET_DIR/.claude/settings.local.json"
     if [[ -e "$CLAUDE_SETTINGS_LOCAL" || -L "$CLAUDE_SETTINGS_LOCAL" ]]; then
         rm -f "$CLAUDE_SETTINGS_LOCAL"
@@ -132,7 +179,7 @@ if [[ "$WITH_DEVIN" == false && -d "$TARGET_DIR/.devin" ]]; then
             agent_dir=${agent_dir%/}
             agent_name=$(basename "$agent_dir")
             stale="$TARGET_DIR/.devin/agents/$agent_name"
-            if [[ -e "$stale" || -L "$stale" ]]; then
+            if [[ -e "$stale" && ! -L "$stale" ]]; then
                 rm -rf "$stale"
                 echo "Removed stale Devin agent copy: $agent_name"
             fi
@@ -144,7 +191,7 @@ if [[ "$WITH_DEVIN" == false && -d "$TARGET_DIR/.devin" ]]; then
             skill_dir=${skill_dir%/}
             skill_name=$(basename "$skill_dir")
             stale="$TARGET_DIR/.devin/skills/$skill_name"
-            if [[ -e "$stale" || -L "$stale" ]]; then
+            if [[ -e "$stale" && ! -L "$stale" ]]; then
                 rm -rf "$stale"
                 echo "Removed stale Devin skill copy: $skill_name"
             fi
