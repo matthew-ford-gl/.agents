@@ -2,8 +2,8 @@
 
 A central repository of reusable agent definitions, command skills, and lifecycle hooks for Claude Code and Devin CLI. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts render Claude-specific definitions, link Devin definitions where needed, and link shared hooks into the directories where each CLI expects them.
 
-- `install-windows.ps1` / `install-mac.sh` — renders Claude agents and skills with compatible models, creates Devin and hook symlinks where needed, and removes stale Devin copies. Skips any component whose source does not exist.
-- `uninstall-windows.ps1` / `uninstall-mac.sh` — removes the artifacts created by the install script.
+- `install-windows.ps1` / `install-mac.sh` / `install-wsl.sh` — renders Claude agents and skills with compatible models, creates Devin and hook symlinks where needed, and removes stale Devin copies. Skips any component whose source does not exist.
+- `uninstall-windows.ps1` / `uninstall-mac.sh` / `uninstall-wsl.sh` — removes the artifacts created by the install script.
 
 ---
 
@@ -185,6 +185,13 @@ This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `
    ./install-mac.sh
    ```
 
+   **WSL (Windows):**
+   ```bash
+   ./install-wsl.sh
+   ```
+
+   `install-wsl.sh` defaults the install target to your WSL home directory (`~`) so the repo can live on a Windows-mounted drive (e.g. `/mnt/c/Users/<you>/.agents`) while the Claude/Devin configuration is installed into the WSL filesystem. It supports the same `--devin` and `--claude` flags as `install-mac.sh`.
+
    `install-mac.sh` does **not** auto-detect existing tool directories — it defaults to `--claude` only. Pass `--devin` explicitly to also install Devin symlinks, even if `.devin` already exists:
    ```bash
    ./install-mac.sh --devin      # install Devin agent/skill symlinks only
@@ -212,7 +219,12 @@ This repo is intended to be cloned into your user profile as `~/.agents` (e.g. `
    ./uninstall-mac.sh
    ```
 
-   `uninstall-mac.sh` removes Claude and/or Devin artifacts according to the same `--claude`/`--devin` flags as the installer. `uninstall-windows.ps1` auto-detects both installations and takes no flags. Both uninstallers also remove the managed hooks artifact.
+   **WSL (Windows):**
+   ```bash
+   ./uninstall-wsl.sh
+   ```
+
+   `uninstall-mac.sh` and `uninstall-wsl.sh` remove Claude and/or Devin artifacts according to the same `--claude`/`--devin` flags as the installer. `uninstall-wsl.sh` defaults the target to `~` to match `install-wsl.sh`. `uninstall-windows.ps1` auto-detects both installations and takes no flags. All uninstallers also remove the managed hooks artifact.
 
 ---
 
