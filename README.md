@@ -33,6 +33,7 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe / haiku | read-only |
 | `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet / sonnet | read-only + exec |
 | `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe / haiku | read/edit/write/exec |
+| `domain-modeller` | Modelling | Actively sharpens domain language, rules, boundaries, and lifecycles through edge-case scenarios, then records crystallised glossary entries and decisions. | sonnet / sonnet | read/edit/write |
 
 ### Tool Access
 
@@ -50,8 +51,10 @@ the runtime rather than left to convention:
 - **unrestricted** — `orchestrator` and `iterative-orchestrator` have no `allowed-tools` field
   and keep full tool access (including `write`, `edit`, `exec`, `run_subagent`), since they
   are the only agents that actually implement changes and spawn other subagents.
-- `docs-updater` is the one exception outside these tiers: it edits and creates files in
-  `/docs` directly, so it gets `read`, `glob`, `grep`, `edit`, `write`, `exec`.
+- `docs-updater` edits and creates files in `/docs` directly, so it gets `read`, `glob`,
+  `grep`, `edit`, `write`, `exec`.
+- `domain-modeller` records crystallised glossary entries and domain decisions in established
+  project files, so it gets `read`, `glob`, `grep`, `edit`, `write` but no shell access.
 
 ---
 
@@ -131,6 +134,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── dependency-reviewer/
 │   ├── director/
 │   ├── docs-updater/
+│   ├── domain-modeller/
 │   ├── guardian/
 │   ├── historian/
 │   ├── iterative-orchestrator/
