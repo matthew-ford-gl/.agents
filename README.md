@@ -68,11 +68,15 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 | `/ship` | `<task description>` | Short alias for the Orchestrator workflow: plan, review, implement, test, and raise a PR. |
 | `/analyse-bug` | `<bug description>` | Structured root cause analysis pipeline. Correlates live data, ranks hypotheses, runs a multi-persona discussion, and writes `ROOT-CAUSE.md` only after live-data confirmation. |
 | `/verify-fix` | `<ROOT-CAUSE.md> [--diff <diff>]` | Post-implementation verification. Confirms the root cause is addressed, checks for partial fixes, and detects regressions. |
+| `/review-pr` | `<PR URL>` | PR review against requirements and coding standards. Fetches linked issues/work items (GitHub or Azure DevOps), runs parallel requirements-gap and code-standards analysis, presents a PASS/FAIL verdict with a fixes table, and optionally posts comments or fixes issues. |
 | `/review-plans` | `<plan file>` | Adversarial review. Two agents independently attack the plan for fatal flaws and feasibility gaps against the actual codebase. |
 | `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |
 | `/ui-review` | `[route or all]` | Screenshot-driven UX review. Configured via `.claude/ui-review.json`; captures, analyses, fixes, and re-verifies each route. |
+| `/quality-audit` | `[path \| glob \| diff \| (empty)]` | Parallel code quality audit. Checks SOLID violations, naming conventions, cyclomatic/cognitive complexity, and clean-code smells across a path, a diff, or the whole repo. |
 | `/retrospective` | `[task name / PR / bug]` | Post-task knowledge extraction. Reconstructs the session, routes reusable learnings to `bugs/`, `docs/`, `CLAUDE.md`, or `~/.claude/CLAUDE.md`, and proposes process improvements. |
+| `/adr-drafter` | `<decision description>` | Draft an Architecture Decision Record following the repo's own ADR conventions or a sensible default house style. |
+| `/test-failure-triager` | `<test output or description>` | Classify failing tests as production bug, test bug, or flake, with a recommended next step. Works across any test framework. |
 
 ---
 
@@ -149,19 +153,25 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── senior-engineer/
 │   └── user-advocate/
 ├── skills/
+│   ├── adr-drafter/
 │   ├── analyse-bug/
 │   ├── investigate-repo/
 │   ├── iterate/
 │   ├── plan-task/
+│   ├── quality-audit/
 │   ├── retrospective/
 │   ├── review-plans/
+│   ├── review-pr/
 │   ├── ship/
+│   ├── test-failure-triager/
 │   ├── ui-review/
 │   └── verify-fix/
 ├── install-mac.sh
 ├── install-windows.ps1
+├── install-wsl.sh
 ├── uninstall-mac.sh
 ├── uninstall-windows.ps1
+├── uninstall-wsl.sh
 ├── .gitignore
 └── hooks/
     ├── hooks.json
