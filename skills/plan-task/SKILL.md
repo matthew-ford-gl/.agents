@@ -1,6 +1,6 @@
 ---
 name: plan-task
-description: Full planning-to-execution pipeline. Runs 3 parallel analysts, a 6-persona structured debate, and a binding decision. Presents the decision for acceptance, then hands off to the Orchestrator to implement. One command from problem to PR.
+description: Full planning-to-execution pipeline with active domain modelling, 3 parallel analysts, a 6-persona debate, a binding decision, ADR capture, and tracer-bullet ticket decomposition before Orchestrator implementation. One command from problem to PR.
 argument-hint: "<task description or task file path>"
 model: opus
 ---
@@ -10,7 +10,7 @@ Input: `$ARGUMENTS` — a task description, a path to a task file, or the name/I
 
 ## What This Command Does
 
-Runs three parallel planning analysts → synthesises an initial implementation plan → runs a 6-persona structured debate (2 rounds) → Director writes a binding DECISION.md → plan is refined → you accept or re-discuss → Orchestrator implements, reviews, and raises a PR.
+Loads and sharpens the domain model when the task changes domain meaning → runs three parallel planning analysts → synthesises an initial implementation plan → runs a 6-persona structured debate (2 rounds) → Director writes a binding DECISION.md → refines the plan and decomposes it into tracer-bullet tickets → you accept or re-discuss → drafts any required ADR → Orchestrator implements, reviews, and raises a PR.
 
 ---
 
@@ -31,11 +31,29 @@ Pass all loaded context to every agent you spawn in later phases.
 
 ## Phase A: Understand the Task
 
+Derive `{task-slug}` once as a stable lowercase kebab-case summary of the task and reuse it for every artifact.
+
 Read `$ARGUMENTS` to extract:
 - What needs to be built or changed
 - Acceptance criteria (explicit or inferred)
 - Affected files, services, or components
 - Any constraints (deadline, backward compatibility, must-not-break)
+- Whether the task introduces or changes domain terms, identities, invariants, lifecycle rules,
+  ownership, persisted meaning, or bounded-context boundaries → `RUN_DOMAIN_MODELLER`
+- Whether the likely decision adds a component, external integration, protocol/data shape,
+  deployment topology, or deliberate departure from an established pattern → `ADR_CANDIDATE`
+
+If `RUN_DOMAIN_MODELLER` is set, launch `domain-modeller` through the Spawning mechanism
+before planning. Pass the task and all loaded context, and ask it to challenge the changed
+model with discriminating scenarios. Capture its complete required output as
+`{task-slug}-domain-model.md` and load every knowledge file it updated. It may update an
+established glossary or decision record as its contract permits. If it needs
+domain-owner clarification, STOP and obtain it before Phase B. Pass its full output and any
+updated domain files to every later agent. If the task only uses existing vocabulary without
+changing the model, do not launch it.
+
+Record `ADR_CANDIDATE` as provisional. The Director determines whether the accepted decision
+actually requires an ADR; do not draft one before the acceptance gate.
 
 ---
 
@@ -44,8 +62,9 @@ Read `$ARGUMENTS` to extract:
 Detect which runtime you are in and use its native mechanism for parallel agents —
 "Task"/"subagent" naming below is descriptive, not a literal tool name in every host.
 
-- **Claude Code**: spawn each agent as a `Task` tool call with `subagent_type` set to the
-  named persona.
+- **Claude Code**: spawn each custom persona as a `Task` tool call with `subagent_type` set to
+  its name. For task-scoped generic analysts that have no AGENT.md, use an unnamed/general
+  Task with the full analyst prompt and do not invent a `subagent_type`.
 - **Devin CLI**: spawn each agent with the `run_subagent` tool, `profile: "<name>"`,
   `is_background: true` for every agent launched in the same phase, then collect each with
   `read_subagent` (`block: true`) once all have been launched in that phase.
@@ -62,7 +81,9 @@ Detect which runtime you are in and use its native mechanism for parallel agents
 
 ## Phase B: Parallel Analysis (3 agents simultaneously)
 
-Launch THREE agents in parallel, using the Spawning mechanism above:
+Launch THREE generic agents in parallel, using the runtime branch in the Spawning mechanism
+above: unnamed/general Tasks in Claude Code and `profile: "subagent_general"` in Devin CLI.
+These are task-scoped analyst prompts, not named custom personas and do not require AGENT.md files:
 
 **Agent 1 — Risk & Compatibility Analyst**: Analyse backward compatibility and change risk.
 - What existing behaviour could break? What consumers depend on the changed interface?
@@ -102,6 +123,9 @@ Synthesise the three analyst outputs into an implementation plan. Do not spawn a
 
 ## Monitoring
 {Post-deploy signals from the Impact Analyst}
+
+## Decision Records
+{Whether this is an ADR candidate, the decision that may need recording, and why; otherwise `None`}
 ```
 
 Save to `{task-slug}-implementation.md`.
@@ -143,7 +167,10 @@ Execute the Director binding decision inline — do not spawn a subagent.
    `.devin/agents/director/AGENT.md` → `.claude/agents/director.md` →
    `~/.agents/agents/director/AGENT.md` → `~/.claude/agents/director.md`. Read it for the DECISION.md schema
 2. All 12 discussion outputs (R1 + R2) are already in context
-3. Synthesise into a binding DECISION.md:
+3. Apply the Director's complete decision framework, not only its output schema. A Guardian
+   Safety Veto is binding: the verdict must be `REJECT` or `DEFER`. Do not downgrade or
+   override it through majority opinion, schedule pressure, or inline synthesis.
+4. Synthesise into a binding DECISION.md:
    - Verdict: `PROCEED` | `PROCEED WITH MODIFICATIONS` | `DEFER` | `REJECT`
    - Rationale referencing specific debate evidence
    - Modifications required (if any)
@@ -152,7 +179,8 @@ Execute the Director binding decision inline — do not spawn a subagent.
    - Success criteria
    - Rollback conditions
    - Deferred items
-4. Save to `{task-slug}-DECISION.md`
+   - Architecture Decision Record: `Required: YES` or `Required: NO`, with the specific durable decision and rationale when `YES`
+5. Save to `{task-slug}-DECISION.md`
 
 ---
 
@@ -163,6 +191,24 @@ Apply the DECISION.md modifications to the implementation plan:
 2. Replace the test strategy section with the Craftsman's final Test-First Strategy table
 3. Add rollout and rollback conditions from the decision
 4. Overwrite `{task-slug}-implementation.md` with the refined plan
+
+### Decompose into tracer-bullet tickets
+
+Write `{task-slug}-tickets.md` from the refined plan. Each ticket must deliver one vertically
+integrated, independently verifiable increment rather than a horizontal layer. Include:
+
+- Ticket title and user- or operator-visible outcome
+- Acceptance criteria covered
+- Public test seam and red-green order
+- Expected files or subsystem, without prescribing unsupported implementation details
+- Blocking ticket IDs; use `none` when independent
+- Rollback or migration constraint when applicable
+- Definition of done with a runnable verification result
+
+Order tickets as a dependency graph and identify the first tracer bullet. Every implementation
+step and acceptance criterion must map to at least one ticket, with no duplicated ownership.
+Keep deferred work out of the active graph under a separate `Deferred` heading. Do not publish
+tickets to an external tracker before human acceptance.
 
 ---
 
@@ -183,6 +229,8 @@ Key risks identified:
   {2–3 most significant risks from the debate}
 
 Test strategy: {n} tests across {layers} — see {task-slug}-DECISION.md for full table
+Tickets: {n} tracer-bullet tickets — see {task-slug}-tickets.md
+ADR: {required and decision summary | not required}
 
 Deferred: {anything explicitly out of scope}
 
@@ -202,7 +250,23 @@ Wait for human response before proceeding.
 
 ---
 
-## Phase I: Orchestrator Handoff
+## Phase I: Record the Accepted Architectural Decision
+
+If DECISION.md says `Required: YES` under `Architecture Decision Record`, use the host's
+Skill mechanism to invoke `adr-drafter`; if the host cannot invoke skills from a skill, resolve
+its SKILL.md using project-before-user precedence and follow it inline. Pass the accepted
+decision, alternatives and trade-offs from the debate, affected code and contracts, and any
+superseded ADR. The human's acceptance authorises drafting the new ADR but not silently
+rewriting an existing one. If the drafter identifies unresolved facts that would require
+inventing part of the decision, STOP and ask the human.
+
+If DECISION.md says `Required: NO` under `Architecture Decision Record`, do not invoke the skill. Domain glossary and decision
+files already updated by `domain-modeller` remain inputs to implementation but are not a
+substitute for an ADR when the Director required one.
+
+---
+
+## Phase J: Orchestrator Handoff
 
 Invoke the Orchestrator using the Spawning mechanism above, with profile/subagent type
 `orchestrator`.
@@ -233,11 +297,24 @@ TEST STRATEGY:
 
 IMPACT ANALYSIS:
 {full contents of {task-slug}-impact.md}
+
+TRACER-BULLET TICKETS:
+{full contents of {task-slug}-tickets.md}
+
+DOMAIN MODEL:
+{domain-modeller output and exact updated files, or `No active model change`}
+
+ARCHITECTURE DECISION RECORD:
+{new ADR path and full contents, or `Not required`}
 ```
+
+The Orchestrator must execute tickets in dependency order and invoke the `tdd` skill for each
+implementation slice. Ticket boundaries guide sequencing but do not permit separate PRs unless
+the accepted plan explicitly requires them.
 
 ---
 
-## Phase J: Verify the Handoff Report — do not take it on faith
+## Phase K: Verify the Handoff Report — do not take it on faith
 
 When the Orchestrator returns (this applies whether it ran in the foreground or as a
 background subagent via `run_subagent` and was collected with `read_subagent`), check its final report against the Orchestrator's

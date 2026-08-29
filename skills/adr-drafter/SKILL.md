@@ -1,6 +1,7 @@
 ---
 name: adr-drafter
 description: Draft a new Architecture Decision Record (ADR) for a meaningful architectural decision — a new component, external integration, protocol/data-shape change, deployment-topology change, or a deliberate departure from an established pattern — following the current repo's own ADR conventions where they exist, or a sensible default house style otherwise.
+model: sonnet
 ---
 
 You are drafting an Architecture Decision Record. Task: $ARGUMENTS

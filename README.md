@@ -9,7 +9,7 @@ A central repository of reusable agent definitions, command skills, and lifecycl
 
 ## Agents
 
-Agents are discussion personas and reviewers that can be invoked by the orchestrator or by the `/ship`, `/plan-task`, `/iterate`, and `/ui-review` skills.
+Agents are discussion personas and reviewers that can be invoked by the orchestrator or by the `/ship`, `/plan-task`, `/architecture-audit`, `/iterate`, and `/ui-review` skills.
 
 | Agent | Stage | Role | Devin / Claude model | Tools |
 |-------|-------|------|----------------------|-------|
@@ -26,6 +26,7 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `user-advocate` | Discussion | End-user perspective. Traces user journeys, edge cases, and accidental complexity in the UX. | sonnet / sonnet | read-only |
 | `historian` | Discussion | Institutional memory guardian. Cross-references plans against git history, past incidents, and documented patterns. | sonnet / sonnet | read-only + exec |
 | `code-reviewer` | Diff | Reviews the concrete diff against the approved plan for bugs, plan-drift, and standard violations. | swe / haiku | read-only |
+| `backwards-compatibility-reviewer` | Diff | Checks upgrade and mixed-version safety across public APIs, schemas, persisted data, configuration, CLI contracts, events, integrations, deployment ordering, and rollback. | sonnet / sonnet | read-only |
 | `accessibility-reviewer` | Plan & Diff | Conditional reviewer for UI changes. Checks WCAG 2.2 Level AA, keyboard operability, ARIA, and touch targets. | swe / haiku | read-only |
 | `dependency-reviewer` | Plan & Diff | Conditional reviewer for package changes. Checks supply chain, maintenance, license, necessity, transitive deps, and CVEs. | swe / haiku | read-only + web_search |
 | `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet / sonnet | read-only |
@@ -65,11 +66,11 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 
 | Skill | Invocation | What it does |
 |-------|------------|--------------|
-| `/plan-task` | `<task description>` | Full planning-to-execution pipeline. Runs 3 parallel analysts, a 6-persona structured debate, a binding Director decision, then hands off to the Orchestrator to implement and raise a PR. |
+| `/plan-task` | `<task description>` | Full planning-to-execution pipeline. Actively models changed domains, runs 3 analysts and a 6-persona debate, records accepted architectural decisions, decomposes the plan into tracer-bullet tickets, then hands off to the Orchestrator. |
 | `/ship` | `<task description>` | Short alias for the Orchestrator workflow: plan, review, implement, test, and raise a PR. |
 | `/analyse-bug` | `<bug description>` | Structured root cause analysis pipeline. Correlates live data, ranks hypotheses, runs a multi-persona discussion, and writes `ROOT-CAUSE.md` only after live-data confirmation. |
 | `/verify-fix` | `<ROOT-CAUSE.md> [--diff <diff>]` | Post-implementation verification. Confirms the root cause is addressed, checks for partial fixes, and detects regressions. |
-| `/review-pr` | `<PR URL>` | PR review against requirements and coding standards. Fetches linked issues/work items (GitHub or Azure DevOps), runs parallel requirements-gap and code-standards analysis, presents a PASS/FAIL verdict with a fixes table, and optionally posts comments or fixes issues. |
+| `/review-pr` | `<PR URL>` | PR review against requirements, coding standards, and backwards compatibility. Checks upgrade paths, mixed-version deployments, public contracts, persisted data, migration/versioning obligations, and rollback safety before presenting a consolidated PASS/FAIL verdict. |
 | `/review-plans` | `<plan file>` | Adversarial review. Two agents independently attack the plan for fatal flaws and feasibility gaps against the actual codebase. |
 | `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |
@@ -78,6 +79,12 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 | `/retrospective` | `[task name / PR / bug]` | Post-task knowledge extraction. Reconstructs the session, routes reusable learnings to `bugs/`, `docs/`, `CLAUDE.md`, or `~/.claude/CLAUDE.md`, and proposes process improvements. |
 | `/adr-drafter` | `<decision description>` | Draft an Architecture Decision Record following the repo's own ADR conventions or a sensible default house style. |
 | `/test-failure-triager` | `<test output or description>` | Classify failing tests as production bug, test bug, or flake, with a recommended next step. Works across any test framework. |
+| `/tdd` | `<feature or fix slice>` | Execute test-driven development through agreed public seams, one red-green-refactor vertical slice at a time. Model-invoked automatically during feature and bug implementation. |
+| `/prototype` | `<question to answer>` | Build an isolated throwaway experiment for comparing product, UI, state, interaction, or technical design alternatives before production implementation. |
+| `/architecture-audit` | `[subsystem, pain point, or path]` | Run an evidence-backed architecture survey across hotspots, ownership, module depth, coupling, test seams, and evolution risk without implementing changes. |
+| `/handoff` | `[next-session focus]` | Write a temporary, redacted session handoff that references existing artifacts and gives another agent ordered continuation steps. |
+| `/resolving-merge-conflicts` | `[merge context]` | Resolve an in-progress merge or rebase conflict from both sides' primary intent, with explicit safety and completion gates. |
+| `/writing-for-agents` | `<instruction-writing task>` | Reference discipline for reliable agent instructions, context pointers, progressive disclosure, completion criteria, and sources of truth. Model-invoked when agent-consumed files are edited. |
 
 ---
 
@@ -134,6 +141,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 ├── agents/
 │   ├── accessibility-reviewer/
 │   ├── architect/
+│   ├── backwards-compatibility-reviewer/
 │   ├── code-reviewer/
 │   ├── craftsman/
 │   ├── dependency-reviewer/
@@ -157,17 +165,23 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 ├── skills/
 │   ├── adr-drafter/
 │   ├── analyse-bug/
+│   ├── architecture-audit/
+│   ├── handoff/
 │   ├── investigate-repo/
 │   ├── iterate/
 │   ├── plan-task/
+│   ├── prototype/
 │   ├── quality-audit/
+│   ├── resolving-merge-conflicts/
 │   ├── retrospective/
 │   ├── review-plans/
 │   ├── review-pr/
 │   ├── ship/
+│   ├── tdd/
 │   ├── test-failure-triager/
 │   ├── ui-review/
-│   └── verify-fix/
+│   ├── verify-fix/
+│   └── writing-for-agents/
 ├── install-mac.sh
 ├── install-windows.ps1
 ├── install-wsl.sh

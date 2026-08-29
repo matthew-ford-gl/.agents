@@ -1,16 +1,16 @@
 ---
 name: review-pr
-description: Review a pull request against its originating issue/spec and coding standards. Takes a PR URL (GitHub or Azure DevOps), fetches the requirements from linked work items/issues, analyses the diff for requirement gaps and coding standards violations, and presents a consolidated PASS/FAIL verdict with a fixes table.
+description: Review a GitHub or Azure DevOps pull request for requirements compliance, coding standards, and backwards compatibility across upgrades, mixed-version deployments, persisted data, and public contracts. Presents a consolidated PASS/FAIL verdict with a fixes table.
 argument-hint: "<PR URL (GitHub or Azure DevOps)>"
 model: sonnet
 ---
-You are reviewing a pull request against its requirements and coding standards.
+You are reviewing a pull request against its requirements, coding standards, and backwards-compatibility obligations.
 
 Input: `$ARGUMENTS` — a full PR URL. Supports both GitHub and Azure DevOps formats.
 
 ## What This Command Does
 
-Fetches the PR description and linked work items/issues to understand the intent. Then runs two parallel reviewers: one checking whether the code faithfully implements the requirements (no gaps, no bad assumptions, no missing acceptance criteria), and one checking coding standards. Results are consolidated into a single PASS/FAIL verdict with a fixes table. Optionally posts comments to the PR and/or fixes the issues locally.
+Fetches the PR description and linked work items/issues to understand intent. Then runs three parallel reviewers: requirements compliance, coding standards, and backwards compatibility. The compatibility pass checks supported consumers, public contracts, persisted artifacts, configuration and CLI behaviour, mixed-version deployment, rollback, versioning, and migration requirements. Results are consolidated into one PASS/FAIL verdict with a fixes table. Optionally posts comments to the PR and/or fixes issues locally.
 
 ---
 
@@ -62,7 +62,7 @@ If the URL does not match either pattern, stop and tell the human the URL is not
    `includeChangedFiles: true`) via MCP server `azure-devops` to get the PR title,
    description, linked work item IDs, and changed files.
 2. Call `repo_pull_request` (action: `get`) again without extra flags if needed for the
-   diff content — or use `gh` / `az repos pr diff` CLI as a fallback.
+   diff content — or use `az repos pr diff` CLI as a fallback.
 
 ---
 
@@ -107,13 +107,20 @@ Read it.
 `~/.agents/agents/code-reviewer/AGENT.md` -> `~/.claude/agents/code-reviewer.md`.
 Read it.
 
-If either agent definition is missing, stop and tell the human which agent could not be found.
+**`backwards-compatibility-reviewer`**:
+`.devin/agents/backwards-compatibility-reviewer/AGENT.md` ->
+`.claude/agents/backwards-compatibility-reviewer.md` ->
+`~/.agents/agents/backwards-compatibility-reviewer/AGENT.md` ->
+`~/.claude/agents/backwards-compatibility-reviewer.md`.
+Read it.
+
+If any agent definition is missing, stop and tell the human which agent could not be found.
 
 ---
 
-## Phase 5: Run Parallel Review (2 agents simultaneously)
+## Phase 5: Run Parallel Review (3 agents simultaneously)
 
-Launch TWO agents in parallel, using the Spawning mechanism below.
+Launch THREE agents in parallel, using the Spawning mechanism below.
 
 ### Agent 1 — Requirements Compliance
 
@@ -168,17 +175,51 @@ categories. Map these to the consolidated severity scale:
 - Should fix -> MAJOR
 - Nit -> MINOR
 
-**Launch both simultaneously.**
+### Agent 3 — Backwards Compatibility
+
+Pass the full content of the resolved `backwards-compatibility-reviewer` AGENT.md as the
+agent persona, followed by:
+
+```
+You are reviewing this PR diff for backwards compatibility and upgrade safety.
+
+Requirements Summary:
+{Requirements Summary from Phase 3}
+
+PR Description:
+{PR description}
+
+Diff:
+{full diff}
+
+Changed files:
+{file list}
+
+Review repository-visible callers, public exports, specifications, schemas, fixtures,
+examples, deployment manifests, version policy, migrations, and compatibility tests needed
+to establish the old contract and supported consumers. Distinguish confirmed breakage from
+uncertain external-consumer risk.
+
+{Project context from Phase 0}
+```
+
+The backwards-compatibility reviewer returns APPROVED or BLOCKED with CRITICAL / MAJOR /
+MINOR findings. Preserve those severities directly. A described breaking change is not thereby
+safe: verify every versioning, migration, deployment, communication, and rollback obligation
+mandated by repository policy. A fully managed break is summarized without blocking; missing
+or unsafe obligations retain their evidence-based severity.
+
+**Launch all three simultaneously.**
 
 ---
 
 ## Phase 6: Consolidate and Report
 
-After both agents complete, merge all findings into a single table sorted by severity,
-then by source (Requirements first, then Standards).
+After all three agents complete, merge findings into a single table sorted by severity,
+then by source (Requirements, Compatibility, Standards).
 
 Determine the overall verdict:
-- **FAIL** if any CRITICAL or MAJOR finding exists from either agent
+- **FAIL** if any CRITICAL or MAJOR finding exists from any agent
 - **PASS** if only MINOR findings (or none)
 
 Present to the human:
@@ -191,17 +232,21 @@ PR REVIEW — {PR title}
 
 Verdict: {PASS / FAIL}
 
-Requirements:  {PASS / FAIL}  ({n} findings)
-Standards:     {APPROVED / BLOCKED}  ({n} findings)
+Requirements:   {PASS / FAIL}  ({n} findings)
+Compatibility:  {PASS / FAIL}  ({n} findings)
+Standards:      {PASS / FAIL}  ({n} findings)
 
 ┌──────────┬───────────────┬────────────────────────────────────────┬──────────────────┐
 │ Severity │ Category      │ Finding                                │ Location         │
 ├──────────┼───────────────┼────────────────────────────────────────┼──────────────────┤
 │ CRITICAL │ Requirements  │ {description}                          │ {file:line}      │
+│ CRITICAL │ Compatibility │ {description}                          │ {file:line}      │
 │ CRITICAL │ Standards     │ {description}                          │ {file:line}      │
 │ MAJOR    │ Requirements  │ {description}                          │ {file:line}      │
+│ MAJOR    │ Compatibility │ {description}                          │ {file:line}      │
 │ MAJOR    │ Standards     │ {description}                          │ {file:line}      │
 │ MINOR    │ Requirements  │ {description}                          │ {file:line}      │
+│ MINOR    │ Compatibility │ {description}                          │ {file:line}      │
 │ MINOR    │ Standards     │ {description}                          │ {file:line}      │
 └──────────┴───────────────┴────────────────────────────────────────┴──────────────────┘
 
@@ -218,7 +263,7 @@ PR REVIEW — {PR title}
 
 Verdict: PASS
 
-No issues found. Requirements fully addressed. Code meets standards.
+No issues found. Requirements are addressed, compatibility is preserved, and code meets standards.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -266,9 +311,14 @@ Wait for human response.
   1. Check out the PR's source branch locally (use `git` for GitHub, `git` for ADO).
   2. For each CRITICAL and MAJOR finding, implement the fix:
      - For Requirements findings: implement the missing or incomplete requirement.
+     - For Compatibility findings: preserve the old contract or add the required versioning,
+       compatibility layer, migration, deployment ordering, tests, consumer communication,
+       and release guidance.
      - For Standards findings: apply the coding standards fix.
   3. After all fixes, run the project's build/lint/test commands (from `AGENTS.md` or
-     the project's standard tooling) to verify nothing is broken.
+     the project's standard tooling) to verify nothing is broken. Re-run the
+     `backwards-compatibility-reviewer` against the updated diff and resolve every remaining
+     CRITICAL or MAJOR compatibility finding before committing.
   4. Commit with a message summarising the fixes:
      ```
      git commit -m "$(cat <<'EOF'
@@ -293,15 +343,16 @@ Wait for human response.
 Detect which runtime you are in and use its native mechanism for parallel agents:
 
 - **Devin CLI**: spawn each agent with `run_subagent`, `profile: "subagent_general"`,
-  `is_background: true` for both agents, then collect each with `read_subagent`
-  (`block: true`) once both have been launched.
+  `is_background: true` for all three agents, then collect each with `read_subagent`
+  (`block: true`) once all three have been launched.
   - Read each agent's AGENT.md (resolved in Phase 4) and pass its full content as part
-    of the task prompt, since neither `requirements-compliance` nor `code-reviewer` may
-    be recognised built-in profiles.
+    of the task prompt, since the custom reviewer names may not be recognised built-in profiles.
   - **Profile fallback**: if a named profile is rejected as unrecognized, retry using
     `profile: "subagent_general"` with the agent's AGENT.md content in the prompt.
   - **Halt on failure**: if an agent fails to start even after the fallback attempt, STOP
     and tell the human which agent could not run and why.
 - **Claude Code**: spawn each as a `Task` tool call with `subagent_type` set to the
-  agent name.
+  agent name and the complete Phase 5 persona plus review input as the prompt. If a custom
+  type is unavailable despite its AGENT.md being resolved, use an unnamed/general Task with
+  the same full prompt.
 - **Other hosts**: use the native parallel-subagent primitive.

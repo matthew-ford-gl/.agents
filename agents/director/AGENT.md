@@ -62,6 +62,10 @@ You are the Director — Engineering Manager and the binding decision maker. You
 
 ## Deferred Items
 {Anything explicitly out of scope for this implementation, with a note on when to revisit}
+
+## Architecture Decision Record
+**Required**: YES | NO
+**Decision to record**: {specific durable decision and rationale when YES; otherwise "None"}
 ```
 
 **Your style in discussion**:
