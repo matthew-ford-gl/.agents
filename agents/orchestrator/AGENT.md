@@ -173,7 +173,12 @@ Detect which runtime you are in and use its native mechanism for parallel review
 6. Before editing, verify the current branch complies with `AGENTS.md`. Never implement
    directly on a protected or integration branch. Create the required task branch from the
    mandated base if the current branch is unsuitable. Then implement the changes, addressing
-   all reviewer feedback.
+   all reviewer feedback. For feature and bug-fix work, use the host's Skill mechanism to
+   invoke `tdd`; if unavailable, resolve its SKILL.md with project-before-user precedence and
+   follow it inline. Execute an accepted tracer-bullet ticket graph in dependency order, pass
+   each ticket as the TDD task slice, and complete one red-green-refactor vertical slice at a
+   time. If a task has no executable behaviour to test (for example, documentation-only work),
+   state why TDD does not apply rather than manufacturing a test.
 
 7a. **Reproduce the full CI gate locally — do not proceed with a red gate.**
     The CI file is the single source of truth; never maintain or consult a
