@@ -31,8 +31,10 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet / sonnet | read-only |
 | `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe / haiku | read-only |
 | `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe / haiku | read-only |
+| `requirements-compliance` | Diff | Checks whether a code diff faithfully and completely implements the originating issue, spec, or acceptance criteria. Finds requirement gaps, bad assumptions, incomplete implementation, and scope creep. | swe / haiku | read-only |
 | `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet / sonnet | read-only + exec |
 | `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe / haiku | read/edit/write/exec |
+| `domain-modeller` | Modelling | Actively sharpens domain language, rules, boundaries, and lifecycles through edge-case scenarios, then records crystallised glossary entries and decisions. | sonnet / sonnet | read/edit/write |
 
 ### Tool Access
 
@@ -50,8 +52,10 @@ the runtime rather than left to convention:
 - **unrestricted** — `orchestrator` and `iterative-orchestrator` have no `allowed-tools` field
   and keep full tool access (including `write`, `edit`, `exec`, `run_subagent`), since they
   are the only agents that actually implement changes and spawn other subagents.
-- `docs-updater` is the one exception outside these tiers: it edits and creates files in
-  `/docs` directly, so it gets `read`, `glob`, `grep`, `edit`, `write`, `exec`.
+- `docs-updater` edits and creates files in `/docs` directly, so it gets `read`, `glob`,
+  `grep`, `edit`, `write`, `exec`.
+- `domain-modeller` records crystallised glossary entries and domain decisions in established
+  project files, so it gets `read`, `glob`, `grep`, `edit`, `write` but no shell access.
 
 ---
 
@@ -65,11 +69,15 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 | `/ship` | `<task description>` | Short alias for the Orchestrator workflow: plan, review, implement, test, and raise a PR. |
 | `/analyse-bug` | `<bug description>` | Structured root cause analysis pipeline. Correlates live data, ranks hypotheses, runs a multi-persona discussion, and writes `ROOT-CAUSE.md` only after live-data confirmation. |
 | `/verify-fix` | `<ROOT-CAUSE.md> [--diff <diff>]` | Post-implementation verification. Confirms the root cause is addressed, checks for partial fixes, and detects regressions. |
+| `/review-pr` | `<PR URL>` | PR review against requirements and coding standards. Fetches linked issues/work items (GitHub or Azure DevOps), runs parallel requirements-gap and code-standards analysis, presents a PASS/FAIL verdict with a fixes table, and optionally posts comments or fixes issues. |
 | `/review-plans` | `<plan file>` | Adversarial review. Two agents independently attack the plan for fatal flaws and feasibility gaps against the actual codebase. |
 | `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |
 | `/ui-review` | `[route or all]` | Screenshot-driven UX review. Configured via `.claude/ui-review.json`; captures, analyses, fixes, and re-verifies each route. |
+| `/quality-audit` | `[path \| glob \| diff \| (empty)]` | Parallel code quality audit. Checks SOLID violations, naming conventions, cyclomatic/cognitive complexity, and clean-code smells across a path, a diff, or the whole repo. |
 | `/retrospective` | `[task name / PR / bug]` | Post-task knowledge extraction. Reconstructs the session, routes reusable learnings to `bugs/`, `docs/`, `CLAUDE.md`, or `~/.claude/CLAUDE.md`, and proposes process improvements. |
+| `/adr-drafter` | `<decision description>` | Draft an Architecture Decision Record following the repo's own ADR conventions or a sensible default house style. |
+| `/test-failure-triager` | `<test output or description>` | Classify failing tests as production bug, test bug, or flake, with a recommended next step. Works across any test framework. |
 
 ---
 
@@ -131,6 +139,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── dependency-reviewer/
 │   ├── director/
 │   ├── docs-updater/
+│   ├── domain-modeller/
 │   ├── guardian/
 │   ├── historian/
 │   ├── iterative-orchestrator/
@@ -141,23 +150,30 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── pragmatist/
 │   ├── qa-gatekeeper/
 │   ├── repo-investigator/
+│   ├── requirements-compliance/
 │   ├── security-analyst/
 │   ├── senior-engineer/
 │   └── user-advocate/
 ├── skills/
+│   ├── adr-drafter/
 │   ├── analyse-bug/
 │   ├── investigate-repo/
 │   ├── iterate/
 │   ├── plan-task/
+│   ├── quality-audit/
 │   ├── retrospective/
 │   ├── review-plans/
+│   ├── review-pr/
 │   ├── ship/
+│   ├── test-failure-triager/
 │   ├── ui-review/
 │   └── verify-fix/
 ├── install-mac.sh
 ├── install-windows.ps1
+├── install-wsl.sh
 ├── uninstall-mac.sh
 ├── uninstall-windows.ps1
+├── uninstall-wsl.sh
 ├── .gitignore
 └── hooks/
     ├── hooks.json
