@@ -31,6 +31,7 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet / sonnet | read-only |
 | `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe / haiku | read-only |
 | `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe / haiku | read-only |
+| `requirements-compliance` | Diff | Checks whether a code diff faithfully and completely implements the originating issue, spec, or acceptance criteria. Finds requirement gaps, bad assumptions, incomplete implementation, and scope creep. | swe / haiku | read-only |
 | `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet / sonnet | read-only + exec |
 | `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe / haiku | read/edit/write/exec |
 | `domain-modeller` | Modelling | Actively sharpens domain language, rules, boundaries, and lifecycles through edge-case scenarios, then records crystallised glossary entries and decisions. | sonnet / sonnet | read/edit/write |
@@ -149,6 +150,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── pragmatist/
 │   ├── qa-gatekeeper/
 │   ├── repo-investigator/
+│   ├── requirements-compliance/
 │   ├── security-analyst/
 │   ├── senior-engineer/
 │   └── user-advocate/

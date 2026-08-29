@@ -93,59 +93,60 @@ Compile all gathered requirements into a single **Requirements Summary**:
 
 ---
 
-## Phase 4: Run Parallel Review (2 agents simultaneously)
+## Phase 4: Resolve Agents
 
-Launch TWO agents in parallel, each receiving the full PR diff, the changed file list,
-the PR description, the Requirements Summary from Phase 3, and all project context
-from Phase 0.
+Resolve each agent's file by checking, in order, and using the first that exists:
 
-### Agent 1 — Requirements Analyst
+**`requirements-compliance`**:
+`.devin/agents/requirements-compliance/AGENT.md` -> `.claude/agents/requirements-compliance.md` ->
+`~/.agents/agents/requirements-compliance/AGENT.md` -> `~/.claude/agents/requirements-compliance.md`.
+Read it.
 
-```
-You are a requirements analyst reviewing a pull request diff against its originating
-issue/spec. Your job is to find gaps between what was asked for and what was implemented.
-
-You have been given:
-- The PR description
-- The full requirements/acceptance criteria from linked work items/issues
-- The PR diff
-
-Analyse the diff against the requirements. For each finding, classify it.
-
-Look for:
-- MISSING REQUIREMENT: An acceptance criterion or stated requirement that has no
-  corresponding change in the diff
-- BAD ASSUMPTION: The code assumes something about the domain, data shape, or user
-  behaviour that contradicts or is not supported by the spec
-- SCOPE CREEP: Changes in the diff that go beyond what the issue/spec asked for and
-  were not flagged as intentional (ignore minor refactors of touched code)
-- INCOMPLETE IMPLEMENTATION: A requirement is partially addressed but edge cases,
-  error handling, or specific scenarios mentioned in the spec are missing
-- SPEC AMBIGUITY: The spec is unclear and the implementation made a choice that could
-  be wrong — flag for human review
-
-For each finding state:
-1. What the requirement says (quote from the issue/spec)
-2. What the diff does (or does not do)
-3. Severity: CRITICAL (blocks acceptance) / MAJOR (likely rework) / MINOR (polish)
-4. The specific file(s) and line(s) involved
-
-If no linked issues or requirements were found, state this explicitly — do not
-fabricate requirements. Instead, review the PR description itself as the spec and
-note that no formal requirements were linked.
-
-End with: PASS (no critical or major findings) or FAIL (one or more critical/major findings).
-```
-
-### Agent 2 — Code Standards Reviewer
-
-Resolve the `code-reviewer` agent by checking, in order, and using the first that exists:
+**`code-reviewer`**:
 `.devin/agents/code-reviewer/AGENT.md` -> `.claude/agents/code-reviewer.md` ->
-`~/.agents/agents/code-reviewer/AGENT.md` -> `~/.claude/agents/code-reviewer.md`. Read it.
+`~/.agents/agents/code-reviewer/AGENT.md` -> `~/.claude/agents/code-reviewer.md`.
+Read it.
+
+If either agent definition is missing, stop and tell the human which agent could not be found.
+
+---
+
+## Phase 5: Run Parallel Review (2 agents simultaneously)
+
+Launch TWO agents in parallel, using the Spawning mechanism below.
+
+### Agent 1 — Requirements Compliance
+
+Pass the full content of the resolved `requirements-compliance` AGENT.md as the agent
+persona, followed by:
 
 ```
-{Full content of the resolved code-reviewer AGENT.md}
+You are reviewing this PR diff for requirements compliance.
 
+Requirements Summary:
+{Requirements Summary from Phase 3}
+
+PR Description:
+{PR description}
+
+Diff:
+{full diff}
+
+Changed files:
+{file list}
+
+{Project context from Phase 0}
+```
+
+The requirements-compliance agent will return APPROVED or BLOCKED with findings classified
+as CRITICAL / MAJOR / MINOR. Map the verdict: APPROVED -> PASS, BLOCKED -> FAIL.
+
+### Agent 2 — Code Standards
+
+Pass the full content of the resolved `code-reviewer` AGENT.md as the agent persona,
+followed by:
+
+```
 You are reviewing this PR diff. There is no prior approved plan — treat the PR description
 as the plan. Review the diff for coding standards violations.
 
@@ -171,7 +172,7 @@ categories. Map these to the consolidated severity scale:
 
 ---
 
-## Phase 5: Consolidate and Report
+## Phase 6: Consolidate and Report
 
 After both agents complete, merge all findings into a single table sorted by severity,
 then by source (Requirements first, then Standards).
@@ -223,7 +224,7 @@ No issues found. Requirements fully addressed. Code meets standards.
 
 ---
 
-## Phase 6: Post Comments — STOP and ask
+## Phase 7: Post Comments — STOP and ask
 
 If there are findings (any severity), ask the human:
 
@@ -245,11 +246,11 @@ Wait for human response.
     each finding with the appropriate file path and line position. Set thread status to
     `Active` for CRITICAL/MAJOR findings and `Closed` for MINOR (nit) findings.
   - After posting, confirm to the human how many comments were posted.
-- **No**: Continue to Phase 7.
+- **No**: Continue to Phase 8.
 
 ---
 
-## Phase 7: Fix Issues — STOP and ask
+## Phase 8: Fix Issues — STOP and ask
 
 If there are CRITICAL or MAJOR findings, ask the human:
 
@@ -294,7 +295,13 @@ Detect which runtime you are in and use its native mechanism for parallel agents
 - **Devin CLI**: spawn each agent with `run_subagent`, `profile: "subagent_general"`,
   `is_background: true` for both agents, then collect each with `read_subagent`
   (`block: true`) once both have been launched.
-  - Read the `code-reviewer` AGENT.md and pass its full content as part of the task prompt
-    for Agent 2, since `code-reviewer` may not be a recognised built-in profile.
-- **Claude Code**: spawn each as a `Task` tool call.
+  - Read each agent's AGENT.md (resolved in Phase 4) and pass its full content as part
+    of the task prompt, since neither `requirements-compliance` nor `code-reviewer` may
+    be recognised built-in profiles.
+  - **Profile fallback**: if a named profile is rejected as unrecognized, retry using
+    `profile: "subagent_general"` with the agent's AGENT.md content in the prompt.
+  - **Halt on failure**: if an agent fails to start even after the fallback attempt, STOP
+    and tell the human which agent could not run and why.
+- **Claude Code**: spawn each as a `Task` tool call with `subagent_type` set to the
+  agent name.
 - **Other hosts**: use the native parallel-subagent primitive.
