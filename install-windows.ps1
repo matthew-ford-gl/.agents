@@ -170,6 +170,25 @@ function Install-Hooks {
     }
 }
 
+function Install-SkillDependencies {
+    $python = Get-Command py -ErrorAction SilentlyContinue
+    $pythonArgs = @('-3')
+    if (-not $python) {
+        $python = Get-Command python -ErrorAction SilentlyContinue
+        $pythonArgs = @()
+    }
+    if (-not $python) {
+        throw 'Python 3 is required to install screenshot and browser-control dependencies.'
+    }
+
+    $screenshotRequirements = Join-Path $canonicalSkillsRoot 'screenshot\requirements.txt'
+    $browserRequirements = Join-Path $canonicalSkillsRoot 'browser-control\requirements.txt'
+    & $python.Source @pythonArgs -m pip install -r $screenshotRequirements -r $browserRequirements
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to install screenshot and browser-control Python dependencies.' }
+    & $python.Source @pythonArgs -m playwright install chromium
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to install Playwright Chromium.' }
+}
+
 if (-not (Test-Path $UserRoot)) {
     throw "User root not found: $UserRoot"
 }
@@ -181,6 +200,7 @@ if (-not (Test-Path $devinRoot)) {
     Write-Warning "Devin folder not found at $devinRoot — skipping Devin cleanup"
 }
 
+Install-SkillDependencies
 Install-Agents
 Install-Skills
 Install-Hooks
