@@ -35,6 +35,23 @@ AGENTS_SOURCE="$SCRIPT_DIR/agents"
 SKILLS_SOURCE="$SCRIPT_DIR/skills"
 HOOKS_SOURCE="$SCRIPT_DIR/hooks/hooks.json"
 
+install_skill_dependencies() {
+    local python_cmd
+    if command -v python3 >/dev/null 2>&1; then
+        python_cmd=$(command -v python3)
+    elif command -v python >/dev/null 2>&1; then
+        python_cmd=$(command -v python)
+    else
+        echo "Python 3 is required to install screenshot and browser-control dependencies." >&2
+        return 1
+    fi
+
+    "$python_cmd" -m pip install \
+        -r "$SKILLS_SOURCE/screenshot/requirements.txt" \
+        -r "$SKILLS_SOURCE/browser-control/requirements.txt"
+    "$python_cmd" -m playwright install chromium
+}
+
 render_claude_definition() {
     local source_file=$1
     local destination_file=$2
@@ -82,6 +99,7 @@ render_claude_definition() {
 }
 
 echo "Installing agents and skills from $SCRIPT_DIR into $TARGET_DIR"
+install_skill_dependencies
 
 if [[ "$WITH_CLAUDE" == true ]]; then
     CLAUDE_AGENTS_DIR="$TARGET_DIR/.claude/agents"
