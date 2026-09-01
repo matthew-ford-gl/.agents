@@ -62,7 +62,7 @@ the runtime rather than left to convention:
 
 ## Skills
 
-Skills are top-level commands that can be invoked by the user to drive a complete workflow.
+Skills are reusable workflows and guidance modules. Some are user-invoked top-level commands; others are invoked automatically by the model.
 
 | Skill | Invocation | What it does |
 |-------|------------|--------------|
@@ -85,6 +85,8 @@ Skills are top-level commands that can be invoked by the user to drive a complet
 | `/handoff` | `[next-session focus]` | Write a temporary, redacted session handoff that references existing artifacts and gives another agent ordered continuation steps. |
 | `/resolving-merge-conflicts` | `[merge context]` | Resolve an in-progress merge or rebase conflict from both sides' primary intent, with explicit safety and completion gates. |
 | `/writing-for-agents` | `<instruction-writing task>` | Reference discipline for reliable agent instructions, context pointers, progressive disclosure, completion criteria, and sources of truth. Model-invoked when agent-consumed files are edited. |
+| `web-accessibility` | Model-invoked | Builds and reviews web interfaces against WCAG 2.2 Level AA, including semantics, keyboard behaviour, focus, ARIA, forms, touch, and layered verification. |
+| `web-performance` | Model-invoked | Measures and improves browser loading and interaction performance using Core Web Vitals, critical-path diagnosis, asset delivery, and comparable before/after evidence. |
 
 ---
 
@@ -166,21 +168,29 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── adr-drafter/
 │   ├── analyse-bug/
 │   ├── architecture-audit/
+│   ├── browser-control/
 │   ├── handoff/
 │   ├── investigate-repo/
 │   ├── iterate/
 │   ├── plan-task/
+│   ├── prompt-craft/
+│   ├── prose/
 │   ├── prototype/
 │   ├── quality-audit/
 │   ├── resolving-merge-conflicts/
 │   ├── retrospective/
 │   ├── review-plans/
 │   ├── review-pr/
+│   ├── screenshot/
 │   ├── ship/
+│   ├── skill-creator/
+│   ├── subagent-dispatch/
 │   ├── tdd/
 │   ├── test-failure-triager/
 │   ├── ui-review/
 │   ├── verify-fix/
+│   ├── web-accessibility/
+│   ├── web-performance/
 │   └── writing-for-agents/
 ├── install-mac.sh
 ├── install-windows.ps1
