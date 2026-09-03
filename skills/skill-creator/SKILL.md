@@ -168,7 +168,7 @@ For objectively testable or consequential skills:
 6. Record pass/fail evidence, errors, token or timing data when available, and qualitative feedback.
 7. Summarize discriminating improvements, regressions, variance, and cost trade-offs.
 
-Keep evaluation artifacts in a sibling `<skill-name>-workspace/iteration-N/` directory unless project conventions specify another location. Do not require upstream scripts, graders, or viewers that are absent from the installed skill; use available host tools and clearly report any omitted metric.
+Keep evaluation artifacts outside the installed skill tree. Resolve the host operating system's temporary directory and use `<temp>/<skill-name>-workspace/iteration-N/`; remove artifacts created for the run before finishing unless the user asks to preserve them. If the host has no writable temporary directory, ask the user where to place them rather than creating a sibling workspace. Do not require upstream scripts, graders, or viewers that are absent from the installed skill; use available host tools and clearly report any omitted metric.
 
 Complete this phase when evidence shows where the draft helps, does not help, or regresses behavior.
 
