@@ -58,7 +58,14 @@ Complete when the PR's source branch is checked out locally with a clean worktre
 
 ## Phase 3: Bring the branch up to date with the default branch
 
-Invoke the `merge-default-branch` skill to merge the remote default branch into this branch and push the result. Let it own conflict resolution (it hands off to `resolving-merge-conflicts` itself) and validation — do not duplicate that logic here.
+`merge-default-branch` has `disable-model-invocation: true` and cannot be invoked via the Skill tool from here — this phase performs the same steps directly instead, staying within the authorization already granted by this skill's own user invocation (fetch, merge, push on the PR's own branch).
+
+1. Discover the remote default branch (remote's symbolic `HEAD` — do not assume `main`/`master`) and fetch it without pruning or touching unrelated refs.
+2. Merge `<remote>/<default>` into the current branch using the repository's documented merge policy. Do not rebase, squash, or use a blanket `ours`/`theirs` strategy.
+3. If Git reports conflicts, invoke the `resolving-merge-conflicts` skill with the target branch, fetched source ref, and this skill's existing authorization to complete the merge commit. Return here only after it reports zero unresolved paths or a blocker.
+4. If already up to date, continue without an empty commit. Otherwise complete the merge commit with normal hooks and message conventions.
+5. Run the repository's required validation (from `AGENTS.md`/CI) on the integrated result; fix only failures caused by the integration.
+6. Push the current branch normally (no force). Stop on a non-fast-forward rejection and ask the user how to reconcile it.
 
 If repository policy (`AGENTS.md`/`CONTRIBUTING`/`CLAUDE.md`) mandates rebase or linear history instead of a merge commit, rebase onto the default branch instead. A rebase rewrites commits already pushed on this PR branch, so **stop and ask the user before force-pushing** the rebased branch — this is the one force-push this skill may ever need, and it needs explicit per-use confirmation regardless of how this skill was invoked.
 
