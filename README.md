@@ -33,6 +33,7 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe / haiku | read-only |
 | `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe / haiku | read-only |
 | `requirements-compliance` | Diff | Checks whether a code diff faithfully and completely implements the originating issue, spec, or acceptance criteria. Finds requirement gaps, bad assumptions, incomplete implementation, and scope creep. | swe / haiku | read-only |
+| `quality-auditor` | Utility | Standalone SOLID/naming/complexity/clean-code auditor. Invoked once per file chunk in parallel by `/quality-audit`; each pass covers every dimension for its own chunk only. | swe / haiku | read-only |
 | `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet / sonnet | read-only + exec |
 | `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe / haiku | read/edit/write/exec |
 | `domain-modeller` | Modelling | Actively sharpens domain language, rules, boundaries, and lifecycles through edge-case scenarios, then records crystallised glossary entries and decisions. | sonnet / sonnet | read/edit/write |
@@ -71,6 +72,7 @@ Skills are reusable workflows and guidance modules. Some are user-invoked top-le
 | `/analyse-bug` | `<bug description>` | Structured root cause analysis pipeline. Correlates live data, ranks hypotheses, runs a multi-persona discussion, and writes `ROOT-CAUSE.md` only after live-data confirmation. |
 | `/verify-fix` | `<ROOT-CAUSE.md> [--diff <diff>]` | Post-implementation verification. Confirms the root cause is addressed, checks for partial fixes, and detects regressions. |
 | `/review-pr` | `<PR URL>` | PR review against requirements, coding standards, and backwards compatibility. Checks upgrade paths, mixed-version deployments, public contracts, persisted data, migration/versioning obligations, and rollback safety before presenting a consolidated PASS/FAIL verdict. |
+| `/land-pr` | `<PR number or URL>` | Drives a PR to merge-ready: syncs with the default branch, resolves every review thread, investigates and fixes failing/expired CI checks, and loops until every thread is resolved and the required reviewer's vote is a full approval. Never merges — hands off a clean PR for the user to complete. |
 | `/review-plans` | `<plan file>` | Adversarial review. Two agents independently attack the plan for fatal flaws and feasibility gaps against the actual codebase. |
 | `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |
@@ -87,6 +89,16 @@ Skills are reusable workflows and guidance modules. Some are user-invoked top-le
 | `/writing-for-agents` | `<instruction-writing task>` | Reference discipline for reliable agent instructions, context pointers, progressive disclosure, completion criteria, and sources of truth. Model-invoked when agent-consumed files are edited. |
 | `web-accessibility` | Model-invoked | Builds and reviews web interfaces against WCAG 2.2 Level AA, including semantics, keyboard behaviour, focus, ARIA, forms, touch, and layered verification. |
 | `web-performance` | Model-invoked | Measures and improves browser loading and interaction performance using Core Web Vitals, critical-path diagnosis, asset delivery, and comparable before/after evidence. |
+| `/merge-default-branch` | `[optional remote or default-branch override]` | Merges the remote default branch into the current feature branch, delegates conflicts to `resolving-merge-conflicts`, validates the integration, and pushes. User-invoked only. |
+| `/report-remediation-planner` | `<report path, pasted findings, or report URL>` | Synthesises a multi-finding report into a prioritised, phased remediation plan with common workstreams, dependency order, ownership boundaries, and stable-ID coverage accounting. |
+| `/phased-plan-executor` | `<plan file path> <phase number>` | Executes one phase of an already-written phased plan by dispatching one worktree-isolated subagent per workstream, reconciling conflicts across their reports, then stopping for human approval before any merge or PR. |
+| `/skill-creator` | `<skill creation or improvement task>` | Creates, revises, evaluates, and improves Claude Code/Devin CLI skills and reusable agent definitions through a draft/test/refine loop. |
+| `/skill-reviewer` | `[skill-name \| path] (empty = whole skills/ library)` | Audits one skill or the whole skills library against skill-creator's own frontmatter, body, and validation rules; reports graded findings and fixes them on request. |
+| `subagent-dispatch` | Model-invoked (before any `Agent` call) | Guides whether and how to dispatch subagents: delegate-vs-inline, the delegation contract, model/effort selection, fan-out sizing, fork vs fresh subagent, and verifier dispatch. |
+| `prompt-craft` | `[prompt text \| file path \| review <target>]` | Designs and adversarially reviews prompts, system prompts, and agent/skill dispatch briefs — Claude model behaviour, few-shot design, context engineering, prompt security, and non-Claude porting. |
+| `prose` | Model-invoked (writing/editing prose for humans) | Drafts, edits, and reviews human-facing prose to remove AI writing tells — structural rhythm, reader-job routing, surface kill-list, and optional voice profiles. |
+| `/browser-control` | `<browser automation task>` | Drives a live Chromium/Chrome browser via Playwright — navigate, interact, screenshot, export PDF, extract accessibility trees, record HAR, run scenarios. |
+| `/screenshot` | `[desktop \| active window \| window name]` | Captures and summarizes screenshots from the local desktop, active window, or a named window. |
 
 ---
 
@@ -159,6 +171,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── performance-reviewer/
 │   ├── pragmatist/
 │   ├── qa-gatekeeper/
+│   ├── quality-auditor/
 │   ├── repo-investigator/
 │   ├── requirements-compliance/
 │   ├── security-analyst/
@@ -172,11 +185,15 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── handoff/
 │   ├── investigate-repo/
 │   ├── iterate/
+│   ├── land-pr/
+│   ├── merge-default-branch/
+│   ├── phased-plan-executor/
 │   ├── plan-task/
 │   ├── prompt-craft/
 │   ├── prose/
 │   ├── prototype/
 │   ├── quality-audit/
+│   ├── report-remediation-planner/
 │   ├── resolving-merge-conflicts/
 │   ├── retrospective/
 │   ├── review-plans/
@@ -184,6 +201,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 │   ├── screenshot/
 │   ├── ship/
 │   ├── skill-creator/
+│   ├── skill-reviewer/
 │   ├── subagent-dispatch/
 │   ├── tdd/
 │   ├── test-failure-triager/
