@@ -1,6 +1,6 @@
 ---
 name: web-accessibility
-description: Build and review accessible web interfaces against WCAG 2.2 Level AA. Use when creating or changing HTML, JSX, TSX, Vue, Svelte, forms, navigation, dialogs, menus, tables, interactive components, keyboard behaviour, focus management, ARIA, contrast, motion, touch targets, media alternatives, or screen-reader announcements; also use for WCAG audits and pre-launch web checks. Not for visual-only screenshot critique (use ui-review), browser automation or accessibility-tree capture alone (use browser-control), backend-only work, APIs, CLIs, native apps, or non-UI code.
+description: "Build and review accessible web interfaces against WCAG 2.2 Level AA. Use when creating or changing HTML, JSX, TSX, Vue, Svelte, forms, navigation, dialogs, menus, tables, interactive components, keyboard behaviour, focus management, ARIA, contrast, motion, touch targets, media alternatives, or screen-reader announcements; also use for WCAG audits and pre-launch web checks. Not for: visual-only screenshot critique (use ui-review), browser automation or accessibility-tree capture alone (use browser-control), backend-only work, APIs, CLIs, native apps, or non-UI code."
 ---
 
 # Web Accessibility
@@ -68,3 +68,5 @@ Summarise:
 - remaining manual checks, limitations, follow-up risks, and post-release detection where applicable.
 
 Do not claim WCAG conformance from automated results alone.
+
+Complete this phase when the report lists standard/scope, barriers with criteria, before/after evidence, and remaining checks.

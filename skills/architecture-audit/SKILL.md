@@ -1,8 +1,8 @@
 ---
 name: architecture-audit
-description: Audit a codebase or named subsystem for high-value architectural improvements, prioritising proven change hotspots, module depth, ownership, coupling, test seams, and evolution risk. Produces evidence-backed candidates without implementing them.
+description: "Audit a codebase or named subsystem for high-value architectural improvements, prioritising proven change hotspots, module depth, ownership, coupling, test seams, and evolution risk. Produces evidence-backed candidates without implementing them. Use when a human asks for an architecture review, wants to know where structural risk or high-leverage refactors are, or wants a subsystem surveyed for coupling, ownership, or test-seam problems. Not for: line-level SOLID/naming/complexity checks across a diff or path (use quality-audit), synthesising an existing multi-finding report into a remediation plan (use report-remediation-planner), or full planning-to-execution with domain modelling and ticket decomposition (use plan-task)."
 argument-hint: "<optional subsystem, pain point, or path>"
-model: opus
+model: opus  # synthesizes four parallel specialists' findings into a ranked architectural judgment call, not a lookup or transcription task
 ---
 
 # Architecture Audit
@@ -17,6 +17,8 @@ Read repository instructions, domain context, relevant ADRs, architecture docume
 
 Do not re-litigate an accepted ADR without concrete evidence that its recorded trade-off has materially changed.
 
+Complete this phase when the scope is fixed to a named subsystem, pain point, or evidence-backed hotspot, and any binding ADRs or constraints are identified.
+
 ## 2. Investigate in parallel
 
 Launch these agents concurrently and pass actual relevant file content plus loaded context:
@@ -26,12 +28,11 @@ Launch these agents concurrently and pass actual relevant file content plus load
 - `quality-auditor` — complexity and design smells that make the hotspot hard to understand or change
 - `qa-gatekeeper` — current public test seams, missing behavioural coverage, and architecture that obstructs reliable testing
 
-Use each identifier as the Claude `subagent_type` or Devin `run_subagent` profile. Launch all four
-before collecting results. If a custom profile is unavailable, load its AGENT.md with
-project-before-user precedence and pass the full persona to an unnamed/general Task in Claude
-Code or `profile: "subagent_general"` in Devin CLI.
+Use each identifier as the `subagent_type` (or platform equivalent) and launch all four in the same turn. Follow the `subagent-dispatch` skill for dispatch mechanics, platform mapping, and the fallback to use when a named profile is unavailable.
 
 Require every finding to cite files, lines, history, tests, or ADR evidence. Absence of evidence is not a finding.
+
+Complete this phase when all four agents have returned, and every finding carries a file, line, history, test, or ADR citation.
 
 ## 3. Test each candidate
 
@@ -46,6 +47,8 @@ For each proposed improvement, establish:
 - **ADR compatibility** — aligned, neutral, or a justified request to revisit a recorded decision
 
 Reject speculative abstractions supported by only one hypothetical future use. Two real consumers may justify a shared seam; one does not by itself.
+
+Complete this phase when every candidate has been checked against all seven tests and any candidate resting on a single hypothetical consumer is discarded.
 
 ## 4. Rank and report
 

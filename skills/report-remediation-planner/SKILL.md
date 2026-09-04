@@ -2,7 +2,7 @@
 name: report-remediation-planner
 description: "Synthesises multi-finding reports into a complete, prioritised remediation plan with common workstreams, dependency order, ownership boundaries, duplicate handling, and stable-ID coverage accounting. Use when asked to analyse an audit, scan, assessment, or report containing multiple findings; group issues by common threads; create a programme of fixes; or decide what to tackle first. Not for: implementing fixes, investigating one bug, validating findings against a repository, or summarising a report without a remediation plan."
 argument-hint: "<report path, pasted findings, or report URL>"
-model: opus
+model: opus  # opus: needed for synthesis/reasoning depth when reconciling many findings into a dependency-ordered plan
 ---
 
 # Report Remediation Planner

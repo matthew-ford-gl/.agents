@@ -2,7 +2,7 @@
 
 Loaded in REVIEW mode. Systematic audit for any prompt: system prompts, agent definitions, dispatch briefs, skill bodies, multi-turn templates. Sections key back to the SKILL.md principles (#1–#9).
 
-**Framing.** Run every audit as a search for defects. Confirmatory framing ("verify this works", "check this is correct") collapses defect detection across models (2603.18740 — effect sizes live in the agent skill's verifier-dispatch reference). Models also cannot see their own structural problems: in VISTA (2603.18388), self-reflecting models produced "zero structural attributions across all configurations" — which is why this protocol audits the structural skeleton before wording, and why the golden test uses a separate fresh-context runner.
+**Framing.** Run every audit as a search for defects. Confirmatory framing ("verify this works", "check this is correct") collapses defect detection across models (2603.18740 — effect sizes live in the subagent-dispatch skill's verifier-dispatch reference). Models also cannot see their own structural problems: in VISTA (2603.18388), self-reflecting models produced "zero structural attributions across all configurations" — which is why this protocol audits the structural skeleton before wording, and why the golden test uses a separate fresh-context runner.
 
 ## Contents
 
@@ -109,7 +109,7 @@ Only for prompts that define agents, dispatch subagents, use tools, or run multi
 
 **Agent loop.** The effective loop is gather → act → verify → repeat. Check: a context-gathering step exists; actions are discrete and verifiable; verification happens before returning; partial failure degrades gracefully. Anti-pattern: "Search for X and return results" (no verification). Better: "Search for X. Verify results match [criteria]; refine if not. Return only verified matches."
 
-**Return size.** Output constrained to a distilled summary sized per the agent skill's norm; explicit instruction to distill; file-based handoff for bulk; no "return full content".
+**Return size.** Output constrained to a distilled summary sized per the subagent-dispatch skill's norm; explicit instruction to distill; file-based handoff for bulk; no "return full content".
 
 **Token budgets — house heuristics** (rules of thumb, not research numbers):
 
@@ -117,12 +117,12 @@ Only for prompts that define agents, dispatch subagents, use tools, or run multi
 |---|---|---|
 | System prompt | 500–2,000 tokens | >4K without justification |
 | Dispatch brief | 200–800 tokens | >1,500 |
-| Subagent return | distilled summary per the agent skill's norm | unbounded return instructions |
+| Subagent return | distilled summary per the subagent-dispatch skill's norm | unbounded return instructions |
 | Few-shot examples | 300–600 per example | counts above the purpose table (#5) |
 
-Condition: chained dispatch briefs that follow the agent skill's four-part contract plus a CONTEXT block are exempt up to a higher bound — vague short briefs are the defect, not well-formed long ones.
+Condition: chained dispatch briefs that follow the subagent-dispatch skill's four-part contract plus a CONTEXT block are exempt up to a higher bound — vague short briefs are the defect, not well-formed long ones.
 
-**Least-privilege tools.** Only necessary tools enabled; no write tools for read-only tasks; tool usage guidance present ("Use Grep for X, Read for Y"). Model and effort selection for the dispatch is the agent skill's table — point there, don't re-derive.
+**Least-privilege tools.** Only necessary tools enabled; no write tools for read-only tasks; tool usage guidance present ("Use Grep for X, Read for Y"). Model and effort selection for the dispatch is the subagent-dispatch skill's table — point there, don't re-derive.
 
 **Template quality.** If the prompt uses variables: all variables documented; missing values fail loudly, not silently; names descriptive; defaults sensible.
 
@@ -165,7 +165,7 @@ Only for prompts with examples. Count criterion = purpose-match against the SKIL
 
 ## 8. Verification check
 
-The verifier's quality, not the volume of generation, is what binds output quality (evidence and numbers: the agent skill's verifier-dispatch reference).
+The verifier's quality, not the volume of generation, is what binds output quality (evidence and numbers: the subagent-dispatch skill's verifier-dispatch reference).
 
 | Level | Method | When acceptable |
 |---|---|---|
@@ -206,7 +206,7 @@ Premature-stop scaffolds are model-specific: on Claude use context-awareness pro
 | Self-validation | False confidence; structural defects invisible | #8 | Structurally separate verifier |
 | Prompt-only security | Injection reaches the model as instructions | #9 | Architectural separation (safety.md) |
 | Position burial | Mid-prompt instructions ignored | #4 | Layer separation; re-injection at decision points (context.md) |
-| Goal drift | Agent wanders from objective over long runs | #8 | Goal re-anchoring; the agent skill's failure-prevention patterns |
+| Goal drift | Agent wanders from objective over long runs | #8 | Goal re-anchoring; the subagent-dispatch skill's failure-prevention patterns |
 | Context flooding | Upstream context consumed by verbose subagent returns | #1 | Constrain returns (§5); file handoff for bulk |
 
 ## Verdict table

@@ -1,8 +1,8 @@
 ---
 name: review-pr
-description: Review a GitHub or Azure DevOps pull request for requirements compliance, coding standards, and backwards compatibility across upgrades, mixed-version deployments, persisted data, and public contracts. Presents a consolidated PASS/FAIL verdict with a fixes table.
+description: "Reviews a GitHub or Azure DevOps pull request for requirements compliance, coding standards, and backwards compatibility across upgrades, mixed-version deployments, persisted data, and public contracts, then presents a consolidated PASS/FAIL verdict with a fixes table. Use when given a GitHub or Azure DevOps PR URL and asked to review, gate, or assess it for merge-readiness. Not for: reviewing a local diff or branch with no PR URL (use code-review), single-dimension security-only review (use security-review), or reviewing a plan before any code exists."
 argument-hint: "<PR URL (GitHub or Azure DevOps)>"
-model: sonnet
+model: sonnet  # orchestration/dispatch workload (parsing the PR, fanning out 3 reviewer subagents, consolidating results); the reasoning-heavy work happens in the dispatched agents, so a lighter model here is sufficient
 ---
 You are reviewing a pull request against its requirements, coding standards, and backwards-compatibility obligations.
 
@@ -26,6 +26,8 @@ Before doing anything, load the project-specific context:
 
 Pass all loaded context to the agents you spawn.
 
+Complete when the applicable `AGENTS.md`/`CLAUDE.md` files have been read and any matched `.context/index.md` entries are loaded.
+
 ---
 
 ## Phase 1: Parse the PR URL
@@ -43,53 +45,33 @@ or `{org}.visualstudio.com/{project}/_git/{repo}/pullrequest/{id}`:
 
 If the URL does not match either pattern, stop and tell the human the URL is not recognised.
 
+Complete when `platform` is set and its identifiers are extracted, or the human has been told the URL is unrecognised.
+
 ---
 
 ## Phase 2: Fetch PR Details
 
-### GitHub
+Read `references/github.md` if `platform = github`, or `references/azure-devops.md` if
+`platform = ado`, and follow that file's Phase 2 steps to fetch the PR title,
+description/body, linked issue/work-item references, full diff, and changed-files list.
 
-1. Call `pull_request_read` (method: `get`) via MCP server `devin/github-mcp-server` to get
-   the PR title, description/body, and linked issue references.
-2. Parse the PR body for issue references (`#123`, `Fixes #123`, `Closes #123`,
-   `https://github.com/{owner}/{repo}/issues/{n}`).
-3. Call `pull_request_read` (method: `get_diff`) to get the full diff.
-4. Call `pull_request_read` (method: `get_files`) to get the list of changed files.
-
-### Azure DevOps
-
-1. Call `repo_pull_request` (action: `get`, `includeWorkItemRefs: true`,
-   `includeChangedFiles: true`) via MCP server `azure-devops` to get the PR title,
-   description, linked work item IDs, and changed files.
-2. Call `repo_pull_request` (action: `get`) again without extra flags if needed for the
-   diff content — or use `az repos pr diff` CLI as a fallback.
+Complete when the PR title, description, linked issue/work-item references, full diff, and changed-file list have all been captured.
 
 ---
 
 ## Phase 3: Fetch Requirements Context
 
-Gather the full requirements/spec from every linked work item or issue.
-
-### GitHub
-
-For each linked issue number found in Phase 2:
-- Call `issue_read` (method: `get`) via `devin/github-mcp-server` to get the issue title,
-  body, labels, and state.
-- If the issue body references other issues or specs, follow one level deep.
-
-### Azure DevOps
-
-For each linked work item ID found in Phase 2:
-- Call `wit_work_item` (action: `get`, `expand: Relations`) via `azure-devops` to get
-  the work item title, description, acceptance criteria, state, and relations.
-- For parent work items (e.g. a Task's parent User Story), follow one level up to get
-  the broader context and acceptance criteria.
+Gather the full requirements/spec from every linked work item or issue found in Phase 2.
+Read `references/github.md` or `references/azure-devops.md` (whichever matches `platform`)
+and follow that file's Phase 3 steps to fetch each linked issue or work item.
 
 Compile all gathered requirements into a single **Requirements Summary**:
 - What is the intent of this change?
 - What are the acceptance criteria (explicit or inferred)?
 - What constraints were stated?
 - What is out of scope (if mentioned)?
+
+Complete when the Requirements Summary (intent, acceptance criteria, constraints, out-of-scope) has been compiled from every linked issue or work item.
 
 ---
 
@@ -116,11 +98,14 @@ Read it.
 
 If any agent definition is missing, stop and tell the human which agent could not be found.
 
+Complete when all three agent definitions have been resolved and read, or the human has been told which one is missing.
+
 ---
 
 ## Phase 5: Run Parallel Review (3 agents simultaneously)
 
-Launch THREE agents in parallel, using the Spawning mechanism below.
+Read `references/spawning.md` and use the runtime mechanism it describes to launch all
+three agents below simultaneously.
 
 ### Agent 1 — Requirements Compliance
 
@@ -211,6 +196,8 @@ or unsafe obligations retain their evidence-based severity.
 
 **Launch all three simultaneously.**
 
+Complete when all three agents have returned a verdict (APPROVED/BLOCKED) with their findings.
+
 ---
 
 ## Phase 6: Consolidate and Report
@@ -267,6 +254,8 @@ No issues found. Requirements are addressed, compatibility is preserved, and cod
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
+Complete when the consolidated table (or the no-findings message) has been presented to the human with a single overall PASS/FAIL verdict.
+
 ---
 
 ## Phase 7: Post Comments — STOP and ask
@@ -281,17 +270,12 @@ Would you like me to post these findings as review comments on the PR?
 
 Wait for human response.
 
-- **Yes**:
-  - **GitHub**: Use `pull_request_review_write` (method: `create`) to create a pending
-    review, then `add_comment_to_pending_review` for each finding that has a specific
-    file:line location, then `pull_request_review_write` (method: `submit_pending`) with
-    event `COMMENT` (if PASS) or `REQUEST_CHANGES` (if FAIL). For findings without a
-    specific line, include them in the review body summary.
-  - **Azure DevOps**: Use `repo_pull_request_thread_write` to create a comment thread for
-    each finding with the appropriate file path and line position. Set thread status to
-    `Active` for CRITICAL/MAJOR findings and `Closed` for MINOR (nit) findings.
-  - After posting, confirm to the human how many comments were posted.
+- **Yes**: Read `references/github.md` or `references/azure-devops.md` (whichever matches
+  `platform`) and follow that file's Phase 7 steps to post the findings as PR comments.
+  After posting, confirm to the human how many comments were posted.
 - **No**: Continue to Phase 8.
+
+Complete when the human's choice has been acted on — comments posted and confirmed, or the decision to skip posting is made.
 
 ---
 
@@ -319,16 +303,23 @@ Wait for human response.
      the project's standard tooling) to verify nothing is broken. Re-run the
      `backwards-compatibility-reviewer` against the updated diff and resolve every remaining
      CRITICAL or MAJOR compatibility finding before committing.
-  4. Commit with a message summarising the fixes:
+  4. Commit with a message summarising the fixes. Resolve the attribution line from your own
+     host/runtime, not from any other runtime's convention:
+     - If the repository's or the user's own global instructions (e.g. repo `AGENTS.md`,
+       `CLAUDE.md`) specify a commit-attribution or co-author convention, use it exactly as
+       specified there.
+     - Otherwise, fall back to a generic line naming your own tool, e.g.
+       `Generated with [tool name]`, with a matching `Co-Authored-By:` line for that same
+       tool. Never default to another runtime's convention (for example, do not hardcode a
+       Devin attribution when running under Claude Code or any other host).
+
      ```
      git commit -m "$(cat <<'EOF'
      Address PR review findings
 
      - {summary of each fix}
 
-     Generated with [Devin](https://devin.ai)
-
-     Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>
+     {Attribution line resolved above, per your host's convention}
      EOF
      )"
      ```
@@ -336,23 +327,4 @@ Wait for human response.
   6. Report what was fixed and confirm the push.
 - **No**: Report is complete. Exit.
 
----
-
-## Spawning Mechanism
-
-Detect which runtime you are in and use its native mechanism for parallel agents:
-
-- **Devin CLI**: spawn each agent with `run_subagent`, `profile: "subagent_general"`,
-  `is_background: true` for all three agents, then collect each with `read_subagent`
-  (`block: true`) once all three have been launched.
-  - Read each agent's AGENT.md (resolved in Phase 4) and pass its full content as part
-    of the task prompt, since the custom reviewer names may not be recognised built-in profiles.
-  - **Profile fallback**: if a named profile is rejected as unrecognized, retry using
-    `profile: "subagent_general"` with the agent's AGENT.md content in the prompt.
-  - **Halt on failure**: if an agent fails to start even after the fallback attempt, STOP
-    and tell the human which agent could not run and why.
-- **Claude Code**: spawn each as a `Task` tool call with `subagent_type` set to the
-  agent name and the complete Phase 5 persona plus review input as the prompt. If a custom
-  type is unavailable despite its AGENT.md being resolved, use an unnamed/general Task with
-  the same full prompt.
-- **Other hosts**: use the native parallel-subagent primitive.
+Complete when the fixes are committed, pushed, and reported, or the human has declined and the report is complete.

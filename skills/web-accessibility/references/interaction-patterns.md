@@ -35,7 +35,7 @@ Load the sections that match the component being changed. Prefer a proven projec
 
 - Add buttons, menus, or direct selection as a single-pointer and keyboard alternative to drag-and-drop.
 - Make cancellation and reversal possible before committing consequential reorder or movement.
-- Keep targets at least 24 by 24 CSS pixels or sufficiently spaced; prefer 44 by 44 for touch comfort.
+- Meet the target-size minimum in [WCAG 2.2 AA baseline](wcag-22-aa.md) (2.5.8); prefer 44 by 44 for touch comfort.
 - Ensure hover or focus content can be dismissed, hovered, and kept visible until the user dismisses it or removes its trigger condition.
 
 ## Authentication

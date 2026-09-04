@@ -19,11 +19,11 @@ What dominates the design changes with the target:
 | Target | What dominates | Notes |
 |---|---|---|
 | System prompt | Governance layers (§2); right altitude between hardcoded logic and vagueness | Persists across the whole session — every token is paid on every turn |
-| Agent definition / dispatch brief | Outcome + output contract; zero authorship framing for verifiers | Dispatch decisions belong to the agent skill (§6) |
-| Skill body | Standing instructions, not one-time steps — the body persists in context for the rest of the session | Format and evals belong to skill-craft (§7) |
+| Agent definition / dispatch brief | Outcome + output contract; zero authorship framing for verifiers | Dispatch decisions belong to the subagent-dispatch skill (§6) |
+| Skill body | Standing instructions, not one-time steps — the body persists in context for the rest of the session | Format and evals belong to skill-creator (§7) |
 | Pipeline stage | Input/output contract per stage; structured formats between stages | Module decomposition: optimization.md |
 | Human-runnable prompt | Self-contained context; include a model and effort recommendation inline | The runner may not know the defaults you assume |
-| Degrees of freedom | High freedom (text instructions) for tasks with many valid approaches; low freedom (exact scripts, templates) for fragile operations | Full doctrine for skills lives in skill-craft |
+| Degrees of freedom | High freedom (text instructions) for tasks with many valid approaches; low freedom (exact scripts, templates) for fragile operations | Full doctrine for skills lives in skill-creator |
 
 ## 2. Structure templates
 
@@ -85,10 +85,10 @@ This matches Anthropic's calibration loop: begin with the minimal set of informa
 
 ## 6. Dispatch briefs and agent definitions
 
-This skill writes the prompt text; the agent skill owns the dispatch decision. The four-part delegation contract, model and effort selection, parallelism, and failure prevention live in the agent skill — invoke oberskills:agent for them.
+This skill writes the prompt text; the subagent-dispatch skill owns the dispatch decision. The four-part delegation contract, model and effort selection, parallelism, and failure prevention live in the subagent-dispatch skill — invoke subagent-dispatch for them.
 
-What this skill's principles add to any dispatch text: outcome-focused phrasing rather than an action list; an explicit output contract with a constrained return size (a distilled summary sized per the agent skill's norm, file handoff for bulk); name the artifact the subagent must produce; and zero authorship or intent framing when the subagent is a reviewer or verifier.
+What this skill's principles add to any dispatch text: outcome-focused phrasing rather than an action list; an explicit output contract with a constrained return size (a distilled summary sized per the subagent-dispatch skill's norm, file handoff for bulk); name the artifact the subagent must produce; and zero authorship or intent framing when the subagent is a reviewer or verifier.
 
 ## 7. Skill-body prompts
 
-Skill bodies are prompts — all SKILL.md principles apply, plus two skill-specific facts: the body persists in context for the rest of the session (write standing instructions, never one-time steps), and the description is the routing surface (what + when + triggers + exclusions). Creating, validating, and eval-testing skills is skill-craft's job — invoke oberskills:skill-craft.
+Skill bodies are prompts — all SKILL.md principles apply, plus two skill-specific facts: the body persists in context for the rest of the session (write standing instructions, never one-time steps), and the description is the routing surface (what + when + triggers + exclusions). Creating, validating, and eval-testing skills is skill-creator's job — invoke skill-creator.

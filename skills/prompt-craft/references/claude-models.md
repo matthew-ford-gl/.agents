@@ -1,6 +1,6 @@
 # Claude model behavior and prompt migration
 
-How to prompt current Claude models and migrate prompts written for older ones. Scope note: the model lineup, cost ratios, and effort-selection guidance live in the agent skill's SKILL.md; live IDs and pricing via the claude-api skill. This file covers per-model PROMPTING behavior only.
+How to prompt current Claude models and migrate prompts written for older ones. Scope note: the model lineup, cost ratios, and effort-selection guidance live in the subagent-dispatch skill's SKILL.md; live IDs and pricing via the claude-api skill. This file covers per-model PROMPTING behavior only.
 
 ## Contents
 
@@ -23,7 +23,7 @@ Migration snippet — replace token budgets with:
 "output_config": {"effort": "high"}
 ```
 
-Manual `enabled` + `budget_tokens` is deprecated on 4.6 and rejected on newer models. The hard cost ceiling is `max_tokens`; `effort` is the soft control and "a behavioral signal, not a strict token budget" — it shapes ALL output tokens including tool calls. Which level for which model and task: the agent skill's SKILL.md §3 effort guide.
+Manual `enabled` + `budget_tokens` is deprecated on 4.6 and rejected on newer models. The hard cost ceiling is `max_tokens`; `effort` is the soft control and "a behavioral signal, not a strict token budget" — it shapes ALL output tokens including tool calls. Which level for which model and task: the subagent-dispatch skill's SKILL.md §3 effort guide.
 
 **Per-message steering phrases** (wording-sensitive — use these forms):
 
@@ -56,7 +56,7 @@ The meta-skill payload. When migrating any prompt written for pre-4.6 models, hu
 
 Re-test after each removal. Anthropic, verbatim: "Skills developed for prior models are often too prescriptive for Claude Fable 5 and can degrade output quality." And: "Capability improvements at this level are also a good prompt to re-evaluate which instructions, tools, and guardrails are still needed."
 
-**Instruction budget (community heuristic — not Anthropic guidance).** A practitioner analysis puts frontier models at roughly 150–200 reliably-followed instructions, with Claude Code's system prompt consuming about 50 (humanlayer.dev "Writing a good CLAUDE.md", citing arXiv:2507.11538 — a 2025, pre-Fable, general-LLM paper; the ~50 is the blog's own harness analysis; verified 2026-07-01 as absent from every official prompting page). The direction is sound even though the numbers are soft: treat instruction-following as a capacity bound your prompt shares with the harness, not a target — every rule you add competes for it, so each must earn its place against the removal test (review.md §6). For skill bodies, detailed-compact beats comprehensive — numbers in skill-craft's build reference (SkillsBench 2602.12670).
+**Instruction budget (community heuristic — not Anthropic guidance).** A practitioner analysis puts frontier models at roughly 150–200 reliably-followed instructions, with Claude Code's system prompt consuming about 50 (humanlayer.dev "Writing a good CLAUDE.md", citing arXiv:2507.11538 — a 2025, pre-Fable, general-LLM paper; the ~50 is the blog's own harness analysis; verified 2026-07-01 as absent from every official prompting page). The direction is sound even though the numbers are soft: treat instruction-following as a capacity bound your prompt shares with the harness, not a target — every rule you add competes for it, so each must earn its place against the removal test (review.md §6). For skill bodies, detailed-compact beats comprehensive — numbers in skill-creator's build reference (SkillsBench 2602.12670).
 
 ## 3. Prefill migration table
 
@@ -95,7 +95,7 @@ The full classifier picture (verified against the official pages 2026-07-01): `r
 
 ### Opus 5
 
-Launched 2026-07-24 (`claude-opus-5`), same $5/$25 per MTok as Opus 4.8. Start from the fact that most prompts need nothing — verbatim: "It performs well out of the box on existing Claude Opus 4.8 prompts." What follows is the short list that does need tuning. Model-tier and cost consequences: the agent skill's SKILL.md §3.
+Launched 2026-07-24 (`claude-opus-5`), same $5/$25 per MTok as Opus 4.8. Start from the fact that most prompts need nothing — verbatim: "It performs well out of the box on existing Claude Opus 4.8 prompts." What follows is the short list that does need tuning. Model-tier and cost consequences: the subagent-dispatch skill's SKILL.md §3.
 
 - **Verbosity is a prompting problem, not an effort problem** (verbatim): "The effort parameter controls how much the model thinks rather than how much it says: lowering effort can reduce thinking volume without reliably shortening the visible response." Conciseness block: snippets.md #22. Files it writes to disk run long on a *separate* axis — instruct length there too. Practitioners hit this hardest: one launch-day review named it "Claude Slop."
 - **Delete verification and self-check scaffolding** (verbatim): it "verifies its own work without being told to… instructions like these cause over-verification on Claude Opus 5, and removing them reduces wasted tokens with no loss in quality." Same for "double-check your answer" / "re-verify before responding." This is a delete, not a rewrite, and it applies to harness-level verification steps as well as prompt text.

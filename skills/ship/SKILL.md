@@ -1,7 +1,7 @@
 ---
 name: ship
-description: Orchestrate a task through specialist agents and raise a PR
-model: sonnet
+description: "Orchestrates a task end-to-end through specialist review agents and raises a PR. Use when the user asks to ship, implement, or deliver a change with review gates, as a one-shot (non-route-based) task. Not for: per-route UI iteration loops (use iterate), or planning-only requests (use plan-task)."
+model: sonnet # one-shot orchestration + PR authoring needs reliable multi-step tool use; opus's extra cost isn't justified for this non-iterative workflow
 ---
 You are the orchestrator. Task: $ARGUMENTS
 
@@ -17,5 +17,7 @@ Before doing anything else:
 5. For each agent you will spawn, resolve its file the same way: check, in order,
    `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
    `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`; use the first that exists
+
+Complete this phase when project context and the resolved orchestrator path are both confirmed.
 
 Then execute the workflow. Pass all loaded project context to any agents you spawn.

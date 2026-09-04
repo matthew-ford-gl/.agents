@@ -1,6 +1,6 @@
 ---
 name: test-failure-triager
-description: Classify one or more failing tests as a production bug, test bug, or flake, with a recommended next step. Works across whatever test frameworks/suites the current repo uses. Best invoked right after a test run surfaces failures.
+description: "Classify one or more failing tests as a production bug, test bug, or flake, with a recommended next step, across whatever test frameworks/suites the current repo uses. Use when a test run just surfaced failures and you need root-cause classification before fixing anything. Not for: writing or running the fix itself, or triaging passing/flaky-looking tests with no observed failure."
 ---
 
 You are triaging test failures. Task: $ARGUMENTS
@@ -27,6 +27,8 @@ Don't assume a stack. Detect the relevant test framework(s) from the repo (packa
 6. **Look for test-bug signatures**: hard-coded expected values that recently changed in production, stale fixtures/mocks that no longer match the real shape, tests that re-implement production logic and get it wrong.
 7. **Look for prod-bug signatures**: production code clearly does the wrong thing; the assertion matches documented/expected behaviour (spec, comment, ADR); reverting the suspect commit makes the test pass.
 8. **Classify and recommend** a specific, actionable next step — not a vague "investigate further".
+
+Complete when every failing test has one of the three classifications (or an explicit combination), backed by cited evidence, and a concrete next step.
 
 ## Output format
 

@@ -1,8 +1,8 @@
 ---
 name: ui-review
-description: Iterative screenshot capture, UX analysis, and fix loop — one route at a time until every route is clean
+description: "Captures screenshots, analyses, and fixes UX issues route-by-route against a ui-review.json config. Use when iterating on touch-target/clipping/critical-action problems across routes. Not for: WCAG audits (use web-accessibility) or performance profiling (use web-performance)."
 argument-hint: "[route | all]"
-model: opus
+model: opus  # per-screenshot UX judgment calls and multi-attempt fix decisions need stronger reasoning than mechanical dispatch
 ---
 You are an iterative UI review orchestrator.
 
@@ -13,6 +13,13 @@ Input: `$ARGUMENTS` — a route name to jump to, `all` to restart from the begin
 Captures screenshots of each configured route, analyses them for touch-screen UX issues (missing content, clipped elements, small touch targets, layout problems), fixes any issues found, re-captures to verify, and advances to the next route. Loops until every route is clean or 3 fix attempts are exhausted per route.
 
 Requires a `.claude/ui-review.json` config file in the repo root.
+
+**Disclosure: this workflow runs autonomously across multiple destructive and
+side-effecting actions with no human STOP points in between.** Once started, it will,
+without pausing for per-step approval: delete existing screenshot directories (Step 0),
+start background services on local ports (Step 3), and repeatedly edit source files
+across up to 3 fix attempts per route (Step 6B). Only invoke this skill when you intend
+to consent to that up front.
 
 ---
 
@@ -31,7 +38,7 @@ Read `.claude/ui-review.json` from the repo root. If it is absent, stop and prin
 
 ```
 ❌  No .claude/ui-review.json found. Create one to configure this command.
-    See the schema in ~/.claude/commands/ui-review.md for required fields.
+    See the ui-review.json schema below for required fields.
 ```
 
 ### Config schema
@@ -104,21 +111,9 @@ Read `.claude/ui-review.json` from the repo root. If it is absent, stop and prin
 - Empty and **no state file exists** → delete all files in `{appDir}/{screenshotsDir}/` if the directory exists; proceed as a fresh run.
 - Empty and state file exists → read existing state and resume (do not clear screenshots).
 
-**Screenshot cleanup** — use the shell appropriate for the platform:
-
-PowerShell:
-```powershell
-if (Test-Path "{appDir}/{screenshotsDir}") {
-    Remove-Item "{appDir}/{screenshotsDir}/*" -Recurse -Force
-}
-```
-
-Bash:
-```bash
-if [ -d "{appDir}/{screenshotsDir}" ]; then
-    rm -rf "{appDir}/{screenshotsDir}"/*
-fi
-```
+**Screenshot cleanup** — use the shell appropriate for the platform. See
+`references/platform-commands.md` → "Screenshot cleanup (Step 0)" for the PowerShell/Bash
+command pair.
 
 ---
 
@@ -158,23 +153,8 @@ Stop. Do not schedule another wakeup.
 
 Look up the current route in `config.routes`. For each key in `requiresServices`, look it up in `config.services` and ensure it is running on its configured port before capturing.
 
-**PowerShell:**
-```powershell
-$up = (Test-NetConnection localhost -Port {port} -WarningAction SilentlyContinue).TcpTestSucceeded
-if (-not $up) {
-    Start-Process cmd -ArgumentList "/c {startCommand}" `
-        -WorkingDirectory (Resolve-Path "{workingDir}") -NoNewWindow
-    Start-Sleep -Seconds {startupDelay}
-}
-```
-
-**Bash:**
-```bash
-if ! nc -z localhost {port} 2>/dev/null; then
-    (cd {workingDir} && {startCommand} &)
-    sleep {startupDelay}
-fi
-```
+See `references/platform-commands.md` → "Prerequisite services (Step 3)" for the
+PowerShell/Bash command pair that checks the port and starts the service if needed.
 
 ---
 
@@ -182,17 +162,8 @@ fi
 
 From `{appDir}`, run Playwright. Include only the env vars whose config keys are present — skip `tierEnvVar` / `routeEnvVar` entirely if they are not defined in config.
 
-**PowerShell:**
-```powershell
-$env:{tierEnvVar} = "{tier}"; $env:{routeEnvVar} = "{current}"; npx playwright test --project={playwrightProject}
-```
-
-**Bash:**
-```bash
-{tierEnvVar}={tier} {routeEnvVar}={current} npx playwright test --project={playwrightProject}
-```
-
-Screenshots land in `{appDir}/{screenshotsDir}/{current}--{viewport}.png`.
+See `references/platform-commands.md` → "Capture (Step 4)" for the PowerShell/Bash
+command pair and where screenshots land.
 
 ---
 

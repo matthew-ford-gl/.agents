@@ -1,6 +1,6 @@
 # Porting notes — non-Claude and thinking-off targets
 
-Load this only when the target is NOT a current Claude model, or thinking is disabled. On thinking-enabled Claude, everything below is superseded by adaptive thinking + effort (SKILL.md #6) — and one technique here is an active refusal hazard. This is the plugin-wide porting reference: the agent and skill-craft skills point here rather than carrying their own non-Claude notes.
+Load this only when the target is NOT a current Claude model, or thinking is disabled. On thinking-enabled Claude, everything below is superseded by adaptive thinking + effort (SKILL.md #6) — and one technique here is an active refusal hazard. This is the plugin-wide porting reference: the subagent-dispatch and skill-creator skills point here rather than carrying their own non-Claude notes.
 
 ## Contents
 

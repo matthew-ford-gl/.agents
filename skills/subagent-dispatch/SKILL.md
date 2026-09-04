@@ -1,16 +1,16 @@
 ---
 name: subagent-dispatch
 description: >-
-  Subagent dispatch guidance for the Agent tool — whether to delegate or work
-  inline, the four-part delegation contract, model and effort selection,
-  parallel fan-out sizing, fork vs fresh subagent, and dispatching independent
-  verifier agents. Use before any Agent tool call: spawning subagents, fanning
-  out work across files or research angles, delegating exploration or review,
-  briefing a verifier, or deciding whether delegation is worth it at all.
-  Not for: wording a prompt that isn't an agent dispatch (use oberskills:prompt)
-  or authoring reusable skill and agent definition files — structure,
-  frontmatter, and evals (use oberskills:skill-craft); their prompt bodies
-  (use oberskills:prompt).
+  Guides whether and how to dispatch subagents via the Agent tool — whether
+  to delegate or work inline, the four-part delegation contract, model and
+  effort selection, parallel fan-out sizing, fork vs fresh subagent, and
+  dispatching independent verifier agents. Use before any Agent tool call:
+  spawning subagents, fanning out work across files or research angles,
+  delegating exploration or review, briefing a verifier, or deciding whether
+  delegation is worth it at all. Not for: wording a prompt that isn't an
+  agent dispatch (use prompt-craft) or authoring reusable skill and agent
+  definition files — structure, frontmatter, and evals (use skill-creator);
+  their prompt bodies (use prompt-craft).
 when_to_use: >-
   Before calling the Agent tool. Trigger phrases: dispatch an agent, spawn a
   subagent, use subagents, fan out, parallelize with agents, delegate this
@@ -19,7 +19,7 @@ when_to_use: >-
 
 # Dispatching subagents
 
-Guidance for writing `Agent` tool calls (the Task tool was renamed Agent in v2.1.63; `Task(...)` still works as an alias). A subagent is a context-isolation tool: it spends tokens in its own window and returns a distilled summary, so your window stays clean. That isolation is also the failure surface — the delegation prompt is the only channel in, and the return summary is the only channel out. Keep both channels precise.
+Guidance for writing `Agent` tool calls (renamed from Task in v2.1.63 — alias detail in `references/mechanics.md` §1). A subagent is a context-isolation tool: it spends tokens in its own window and returns a distilled summary, so your window stays clean. That isolation is also the failure surface — the delegation prompt is the only channel in, and the return summary is the only channel out. Keep both channels precise.
 
 Platform mechanics: `references/mechanics.md` in this skill directory · Orchestration patterns: `references/patterns.md` in this skill directory · Verifier dispatch: `references/verifier-dispatch.md` in this skill directory
 
@@ -60,7 +60,7 @@ Once you've decided to delegate, pick the dispatch mode:
 
 Where prompts *can't* surface, pre-grant every permission the task needs — otherwise a delegated edit fails while the subagent reports success.
 
-Spawn-bias drifts across model generations — state trigger conditions in both directions: when a task fans out across independent items, delegate rather than iterating serially; AND when a single read or a sequential edit means just doing it.
+Spawn-bias drifts across model generations — state trigger conditions in both directions (full detail: `references/mechanics.md` §8).
 
 ## 2. The delegation contract
 
@@ -90,7 +90,7 @@ Add a CONTEXT block when the agent needs state from this conversation:
 **Subagents don't inherit your skills.** A fresh subagent has zero awareness of skills you've used. Load them explicitly, as flat lines at the top of the prompt — agents execute flat `Skill(...)` / `Read(...)` lines but skip nested directives like "follow every instruction in that file". Resolve all paths yourself before dispatch:
 
 ```
-Skill(oberskills:write)
+Skill(prompt-craft)
 Read(/abs/path/to/reference.md)
 ```
 
@@ -104,7 +104,7 @@ Write the objective as an outcome, not actions:
 | What will I do with the result? | "Look at it" | "Understand the pattern to add OAuth" |
 | How will I know it succeeded? | "It returns something" | "File paths + the approach, in ≤1 page" |
 
-If the objective can't be stated as an outcome because the user's own intent is ambiguous, run `oberskills:clarify` before dispatching. Length is fine; vagueness is not. For a long or novel brief — a new reusable agent definition, or instructions beyond a screen — invoke `Skill(oberskills:prompt)` for wording-level craft first.
+If the objective can't be stated as an outcome because the user's own intent is ambiguous, ask the user to clarify intent before dispatching. Length is fine; vagueness is not. For a long or novel brief — a new reusable agent definition, or instructions beyond a screen — invoke `Skill(prompt-craft)` for wording-level craft first.
 
 ## 3. Model and effort
 
@@ -128,9 +128,9 @@ Aliases resolve to the latest model in each tier (`claude --help`: "an alias for
 
 **Orchestrator default moves from Fable to Opus 5 — narrowly.** Anthropic positions Opus 5 as "frontier intelligence at half the cost of Claude Fable 5." Independent-but-vendor-coordinated evaluation (Artificial Analysis, run "with Anthropic support" pre-release) puts Opus 5 at max effort first on its Intelligence Index at 61 vs Fable 5's 60 — but the *same* tracker ranks Opus 5 at `high` effort fifth at 59, and Vals AI has Fable 5 ahead by 0.33 points. So the honest reading is a tie at the top that Opus 5 wins only at max effort, at half the price. Start ambiguous long-horizon work on Opus 5 and escalate to Fable on observed failure; Opus 5 also has no zero-data-retention restriction, which Fable does. Expect this to move — Opus 5 shipped 2026-07-24 and no cold third-party eval existed yet.
 
-Gotcha: during capacity incidents, an explicit `model: "opus"` dispatch can hang forever at "Initializing…" — the alias resolves to a different capacity pool than your session's. Omitting `model` inherits the parent's pool and avoids it. Diagnose: subagent transcript with zero assistant records.
+Gotcha: an explicit `model: "opus"` dispatch can hang during capacity incidents — omit `model` to inherit the parent's pool. Full mechanism and diagnosis: `references/mechanics.md` §8.
 
-Routing defaults: research/lookup → `haiku` or Explore; extract/analyze worker → `sonnet` with `effort: low|medium`; write/decide → inherit. Resolution order when several are set: `CLAUDE_CODE_SUBAGENT_MODEL` env var → per-call `model` param → frontmatter `model` → main conversation's model.
+Routing defaults: research/lookup → `haiku` or Explore; extract/analyze worker → `sonnet` with `effort: low|medium`; write/decide → inherit. Resolution order when several are set: `references/mechanics.md` §1.
 
 ## 4. Parallel fan-out
 
@@ -187,8 +187,6 @@ When a dispatch goes wrong, fix the prompt before the model — prompt engineeri
 
 ## 7. Going deeper
 
-- `references/mechanics.md` in this skill directory — Agent tool, built-ins, the canonical subagent frontmatter field table, schema-level boundaries, forks, resume, gotchas.
-- `references/patterns.md` in this skill directory — orchestration pattern catalog, multi-agent sizing evidence, topology selection, long-run harness patterns, defect diagnosis.
-- `references/verifier-dispatch.md` in this skill directory — debiased verification rules, evidence, and a copyable verifier dispatch template.
+See the reference pointers given inline near the top of this file (mechanics, patterns, verifier-dispatch).
 
-Authoring a reusable subagent `.md` definition — file structure, frontmatter, and evals → `Skill(oberskills:skill-craft)`; its prompt body → `Skill(oberskills:prompt)`.
+Authoring a reusable subagent `.md` definition — file structure, frontmatter, and evals → `Skill(skill-creator)`; its prompt body → `Skill(prompt-craft)`.

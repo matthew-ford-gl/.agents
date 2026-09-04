@@ -148,7 +148,7 @@ The most impactful intervention in multi-agent systems is not adding debate, ref
 | Prompt-optimized single agent | ~74.2% |
 | MASS (prompt opt → topology search → re-opt) | 78.8% |
 
-A prompt-optimized single agent beats naive multi-agent debate at equivalent token budgets; most topology blocks are neutral or harmful. If you haven't optimized individual prompts yet, stop — topology on unoptimized prompts wastes compute. Topology choice itself is the agent skill's domain.
+A prompt-optimized single agent beats naive multi-agent debate at equivalent token budgets; most topology blocks are neutral or harmful. If you haven't optimized individual prompts yet, stop — topology on unoptimized prompts wastes compute. Topology choice itself is the subagent-dispatch skill's domain.
 
 ## 8. Long-horizon strategies
 
@@ -156,7 +156,7 @@ Three techniques for work that outlives one context window (Anthropic context-en
 
 1. **Compaction** — summarize near the limit and reinitialize. Danger: "overly aggressive compaction can result in the loss of subtle but critical context." Tune for maximum recall first, then precision. Often better: prefer a fresh context plus filesystem state discovery over compaction — current Claude is highly effective at reconstructing state from progress files, test lists, and git logs, given prescriptive restart steps.
 2. **Structured note-taking / agentic memory** — persist notes outside the window and pull them back later. One lesson per file with a one-line summary (snippets.md #16). **Reason before retrieving:** decompose the goal into sub-goals and query memory on those, and key entries by task + situational state, not the raw instruction string — JARVIS-1 (2311.05997) found reasoning-before-retrieval materially improves which past experiences get pulled.
-3. **Subagent isolation** — specialized subagents handle focused tasks in clean context windows and return only a condensed, distilled summary sized per the agent skill's norm; the detailed search context stays isolated in the subagent.
+3. **Subagent isolation** — specialized subagents handle focused tasks in clean context windows and return only a condensed, distilled summary sized per the subagent-dispatch skill's norm; the detailed search context stays isolated in the subagent.
 
 **State reconstruction (multi-turn template).** For long conversations, reconstruct minimal state each turn instead of replaying history: a compact `<conversation_state>` block holding identity, workflow position, collected fields, and pending actions. Token growth stays linear instead of exponential, and early-turn decisions survive verbatim instead of via lossy recall.
 
@@ -169,7 +169,7 @@ Three techniques for work that outlives one context window (Anthropic context-en
 | Agentic tool-use | tools + instructions + state | Tool definitions buried; state growing unbounded | Structured state; prune completed actions |
 | Multi-turn conversation | state (reconstructed) + memory + query | Exponential history growth | State reconstruction (§8) |
 | Domain-intensive agent | memory (playbook) + instructions + state | Context collapse; brevity bias | Evolving playbook; incremental deltas (§5–6) |
-| Multi-agent system | optimized per-agent instructions | Topology before prompt quality | MASS order (§7); dispatch design via the agent skill |
+| Multi-agent system | optimized per-agent instructions | Topology before prompt quality | MASS order (§7); dispatch design via the subagent-dispatch skill |
 | Long-document analysis | knowledge (top) + query (end) | Trusting nominal window without overlap | §2 placement + quote grounding + retrieval |
 
 ## 10. Checklist

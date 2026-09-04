@@ -30,8 +30,8 @@ Apply only sections connected to the measured bottleneck.
 ## CSS
 
 - Remove unused rules through the project's existing build pipeline.
-- Keep critical styles discoverable without weakening CSP. Prefer external optimized delivery or nonce/hash-based inline styles where the project's security model permits.
-- Never recommend blanket `unsafe-inline`, `unsafe-eval`, wildcards, or disabling CSP as a performance fix.
+- Keep critical styles discoverable using external optimized delivery or nonce/hash-based inline styles where the project's security model permits.
+- CSP is a hard safety boundary — see [SKILL.md](../SKILL.md) step 3.6. Do not loosen it to solve a CSS delivery problem.
 - Verify asynchronous stylesheet techniques against no-script behavior, content flashes, and browser support.
 
 ## Caching and delivery

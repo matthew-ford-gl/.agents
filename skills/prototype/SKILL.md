@@ -1,8 +1,8 @@
 ---
 name: prototype
-description: Build a deliberately throwaway prototype to answer a specific product, interaction, UI, state, or technical design question before production implementation. Use when alternatives need direct comparison or uncertainty is cheaper to resolve experimentally.
+description: "Build a deliberately throwaway prototype to answer a specific product, interaction, UI, state, or technical design question before production implementation. Use when alternatives need direct comparison or uncertainty is cheaper to resolve experimentally. Not for: production implementation work, or spikes that already have a single obvious answer with no real alternatives to compare."
 argument-hint: "<question the prototype must answer>"
-model: sonnet
+model: sonnet  # experiments need fast, cheap iteration over many throwaway variants; a stronger model isn't needed since output is disposable
 ---
 
 # Prototype
@@ -23,6 +23,8 @@ Establish:
 
 If the question or decision criteria are unclear, ask before building.
 
+Complete this phase when the decision, variants, and success/rejection/inconclusive criteria are all stated explicitly.
+
 ## 2. Choose the smallest medium
 
 Prefer, in order:
@@ -35,15 +37,21 @@ For UI alternatives, provide meaningfully different variants selectable from one
 
 Use existing project dependencies only when prototyping inside the application. Do not add a production dependency for a throwaway experiment without approval.
 
+Complete this phase when a single medium is chosen and its location (temp-directory path, script location, or isolated route) is decided.
+
 ## 3. Build only the experiment
 
 Use representative but synthetic data. Include enough edge states to expose the decision: loading, empty, error, long content, constrained viewport, or other states relevant to the question.
 
 Do not connect real credentials, customer data, payments, destructive endpoints, or production services. Mark in-repository prototype code clearly through its isolated location and report that it is disposable.
 
+Complete this phase when every variant runs and every edge state relevant to the question is reachable.
+
 ## 4. Make it observable
 
 Run the prototype and provide the human with the local path or browser preview. Explain how to switch variants and which scenarios to try. Capture console errors and correct anything that prevents a fair comparison.
+
+Complete this phase when the human has a working path or preview and no console error blocks a fair comparison.
 
 ## 5. Record the result
 

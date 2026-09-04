@@ -1,8 +1,7 @@
 ---
 name: handoff
-description: Compact the current session into a temporary, redacted handoff document so another agent can continue unfinished work without reconstructing the conversation.
+description: "Compact the current session into a temporary, redacted handoff document so another agent can continue unfinished work without reconstructing the conversation. Use when ending a session, handing off to another agent, or context is running low. Not for: producing PR descriptions, ADRs, or committing repository changes."
 argument-hint: "<optional focus for the next session>"
-model: sonnet
 ---
 
 # Session Handoff
