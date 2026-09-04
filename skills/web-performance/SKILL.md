@@ -1,6 +1,6 @@
 ---
 name: web-performance
-description: Measure and improve browser loading and interaction performance for websites and web apps. Use for Core Web Vitals, Lighthouse or PageSpeed findings, slow pages, LCP, CLS, INP, TTFB, long main-thread tasks, bundle size, images, fonts, CSS, caching, CDN delivery, hydration, or third-party script impact, including pre-launch web performance checks. Not for visual-only UI review (use ui-review), browser automation or trace capture alone (use browser-control), backend query or API latency tuning, database optimisation, native apps, algorithmic micro-optimisation, or CI build speed.
+description: "Measure and improve browser loading and interaction performance for websites and web apps. Use when triaging Core Web Vitals, Lighthouse or PageSpeed findings, slow pages, LCP, CLS, INP, TTFB, long main-thread tasks, bundle size, images, fonts, CSS, caching, CDN delivery, hydration, or third-party script impact, including pre-launch web performance checks. Not for: visual-only UI review (use ui-review), browser automation or trace capture alone (use browser-control), backend query or API latency tuning, database optimisation, native apps, algorithmic micro-optimisation, or CI build speed."
 ---
 
 # Web Performance
@@ -11,7 +11,7 @@ Measure before changing code. Optimise the demonstrated bottleneck, then repeat 
 
 1. Read project instructions and inspect the framework, rendering model, deployment target, CDN/cache configuration, asset pipeline, browser targets, monitoring, and existing performance tooling.
 2. Identify priority routes, user journeys, representative devices and networks, and whether field data or laboratory data is failing.
-3. Prefer field data from real users for prioritisation; use reproducible laboratory tests for diagnosis when field data is unavailable or too coarse.
+3. Prefer field data for prioritisation and laboratory tests for diagnosis; see [measurement](references/measurement.md) for when each applies and how to record them.
 4. Record the baseline conditions and results, including LCP, CLS, INP where available, TTFB, the LCP element, transfer sizes, long tasks, and relevant diagnostic audits.
 
 Read [Core Web Vitals](references/core-web-vitals.md) when interpreting LCP, CLS, INP, or TTFB. Read [measurement](references/measurement.md) before collecting or comparing evidence.
@@ -42,7 +42,7 @@ Read [asset delivery](references/asset-delivery.md) when the bottleneck involves
 3. Reduce, defer, split, or remove work from the critical path before micro-optimising it.
 4. Keep interaction handlers short; yield or move substantial work where the platform and project support it.
 5. Use framework-native production features only after checking the installed version and project conventions.
-6. Preserve CSP and other security controls. Never loosen `script-src` or `style-src` wholesale to obtain a performance improvement.
+6. Safety boundary: preserve CSP and other security controls. Never loosen `script-src`, `style-src`, or any other directive — including via blanket `unsafe-inline`, `unsafe-eval`, wildcard sources, or disabling CSP — to obtain a performance improvement.
 7. Treat new tools, services, packages, and CDN scripts as separate dependency or security decisions requiring normal approval.
 
 Complete this phase when the implementation is limited to the diagnosed constraint and has a defined rollback.

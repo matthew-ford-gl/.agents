@@ -1,16 +1,20 @@
 ---
 name: browser-control
-description: Control a live Chromium/Chrome browser with Playwright to navigate, interact, capture screenshots, export PDFs, extract accessibility trees, record HAR files, and run browser scenarios. Use when automating a web page, testing a UI flow, taking a page screenshot, running Lighthouse/accessibility checks, or capturing network traffic. Not for static HTML files on disk, build failures, or backend-only debugging.
+description: "Control a live Chromium/Chrome browser with Playwright to navigate, interact, capture screenshots, export PDFs, extract accessibility trees, record HAR files, and run browser scenarios. Use when automating a web page, testing a UI flow, taking a page screenshot, running accessibility-tree checks, or capturing network traffic. Not for: static HTML files on disk, build failures, or backend-only debugging."
 ---
 
 # browser-control
 
 Control a live browser via Playwright and run scripted scenarios. Output is JSON; large artifacts (screenshots, PDFs, HAR, AX tree) are written to disk paths you provide.
 
+## Safety boundary
+
+Confirm scope before automating login/submit flows on systems you do not own; do not hardcode real credentials in scenario files.
+
 ## Dependencies
 
 ```bash
-pip install playwright
+pip install -r requirements.txt
 playwright install chromium
 ```
 
@@ -23,10 +27,10 @@ python scripts/browser.py --scenario scenario.json --channel chrome
 ## Quick start
 
 1. Write a JSON scenario file (see format below).
-2. Run it:
+2. Run it from the skill directory (or with the full path to `scripts/browser.py` on your OS):
 
 ```bash
-python ~/.agents/skills/browser-control/scripts/browser.py --scenario scenario.json
+python scripts/browser.py --scenario scenario.json
 ```
 
 3. The script prints a JSON result with one entry per step.

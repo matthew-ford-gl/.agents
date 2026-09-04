@@ -124,7 +124,7 @@ Mechanism: persona prefixes activate instruction-following pathways that crowd o
 
 ## 10. Example sourcing
 
-Human-curated examples substantially outperform model-self-generated ones, which are net negative — self-generated examples encode the model's existing biases and failure modes back into the prompt (numbers and the skills-context evidence: skill-craft's build reference, 2602.12670). When you lack labeled data, generate synthetic examples from a *stronger* model (Promptomatix-style), never self-generate from the model being prompted.
+Human-curated examples substantially outperform model-self-generated ones, which are net negative — self-generated examples encode the model's existing biases and failure modes back into the prompt (numbers and the skills-context evidence: skill-creator's build reference, 2602.12670). When you lack labeled data, generate synthetic examples from a *stronger* model (Promptomatix-style), never self-generate from the model being prompted.
 
 ## 11. Decision tables
 

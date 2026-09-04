@@ -10,14 +10,14 @@ Capture a local screenshot and summarize the visual result without loading large
 ## Dependencies
 
 ```bash
-pip install mss Pillow
+pip install -r requirements.txt
 ```
 
-Optional for named-window capture:
+`requirements.txt` covers `mss`, `Pillow`, and `pygetwindow` (Windows only, via platform marker). Named-window capture also relies on OS-specific tools that are not pip packages:
 
-- **Windows**: `pip install pygetwindow`
+- **Windows**: `pygetwindow` (installed via requirements.txt)
 - **macOS**: built-in `osascript` and `screencapture`
-- **Linux**: `xdotool` (system package)
+- **Linux**: `xdotool` (system package, install separately)
 
 ## Usage
 
@@ -75,6 +75,7 @@ The `window` field appears only in `--mode window`.
 3. Read the full-resolution image from the returned `full_resolution.path`.
 4. Return a concise summary: what is visible, key UI elements, state, and any actionable items.
 5. If the user asked a specific question, answer it directly.
+6. Complete when the summary covers every element the user asked about.
 
 ## Cross-platform notes
 

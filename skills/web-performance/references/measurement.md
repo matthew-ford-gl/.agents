@@ -36,8 +36,8 @@ Use project-provided Lighthouse, Lighthouse CI, WebPageTest, browser performance
 
 Do not send internal, staging, authenticated, or non-public URLs—or URLs containing credentials, tokens, personal data, or confidential query parameters—to PageSpeed Insights, WebPageTest, or another public audit service. Use local tooling and synthetic data instead.
 
-Keep CSP strict. Performance diagnostics must not require blanket `unsafe-inline`, `unsafe-eval`, wildcard sources, disabled certificate checks, exposed debug endpoints, or embedded API keys. Use environment-variable placeholders for approved service credentials.
+Diagnostics must not weaken CSP — that is a hard safety boundary; see [SKILL.md](../SKILL.md) step 3.6. They also must not require disabled certificate checks, exposed debug endpoints, or embedded API keys. Use environment-variable placeholders for approved service credentials.
 
 ## Before-and-after report
 
-For each target metric, report baseline runs, changed runs, central result and variance, test conditions, and whether the data is lab or field. Include regressions checked, uncertainty, rollback condition, and the field signal that should confirm impact after release.
+Follow the Report step in [SKILL.md](../SKILL.md) (§5). For each target metric, additionally record the central result and variance across runs so baseline and changed numbers are genuinely comparable rather than single favourable samples.

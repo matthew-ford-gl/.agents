@@ -1,8 +1,8 @@
 ---
 name: investigate-repo
-description: Investigate a repository question or validate a Markdown list of findings, checking every claim against current code and proving whether the relevant code is reachable rather than dead.
+description: "Investigate a repository question or validate a Markdown list of findings, checking every claim against current code and proving whether the relevant code is reachable rather than dead. Use when asked to answer a 'how does X work' or 'is Y still used' repository question, verify or validate findings from an existing audit/scan/report against the actual codebase, confirm whether flagged code is dead or reachable in production, or check claims before acting on them. Not for: synthesising multiple findings into a prioritised remediation plan or workstreams (use report-remediation-planner), or running a fresh SOLID/naming/complexity/clean-code scan to generate new findings (use quality-audit)."
 argument-hint: "<question | markdown | path-to-markdown>"
-model: sonnet
+model: sonnet  # orchestration/dispatch workload (parsing claims, fanning out investigators, reconciling results); the reasoning-heavy work happens in the dispatched repo-investigator subagents, so a lighter model here is sufficient
 ---
 
 You are running a read-only repository investigation. Input: `$ARGUMENTS`
@@ -20,6 +20,8 @@ Answer a repository question with evidence, or validate every distinct claim in 
 
 Treat loaded instructions as mandatory and pass their relevant content to every investigator.
 
+Complete this phase when project-specific instructions, standards, and verification commands relevant to the investigation have been identified and loaded (or confirmed absent).
+
 ## Step 2: Resolve the Investigator
 
 Resolve `repo-investigator` by checking, in order, and using the first definition that exists:
@@ -27,6 +29,8 @@ Resolve `repo-investigator` by checking, in order, and using the first definitio
 `.devin/agents/repo-investigator/AGENT.md` → `.claude/agents/repo-investigator.md` → `~/.agents/agents/repo-investigator/AGENT.md` → `~/.claude/agents/repo-investigator.md`.
 
 Read the resolved definition. If none exists, stop and tell the human that the `repo-investigator` agent is missing.
+
+Complete this phase when the `repo-investigator` definition has been resolved and read, or the human has been told it is missing and the workflow has stopped.
 
 ## Step 3: Resolve and Parse the Input
 
@@ -41,6 +45,8 @@ For a source document, preserve any existing finding IDs. Parse tables, headings
 A claim is atomic when one investigator can return one verdict. Split a finding only when it makes independently testable assertions that could receive different verdicts. Do not split one end-to-end data-flow or reachability claim into disconnected fragments.
 
 Before dispatch, print a short manifest containing the number of claims and their IDs or concise titles. If the document is ambiguous enough that parsing choices could change the outcome, ask the human to confirm the manifest. Otherwise continue without blocking.
+
+Complete this phase when every claim has been parsed into an atomic, independently verdict-able unit, the manifest has been printed, and any required human confirmation has been received.
 
 ## Step 4: Dispatch Every Claim
 
@@ -61,6 +67,8 @@ Use the spawning mechanism native to the runtime:
 Run independent claims in parallel, capped at **8 investigators per wave**. Collect all results from a wave before starting the next. If claims overlap heavily or one depends on another's result, run those claims sequentially and pass forward only verified evidence.
 
 If an investigator fails to start even with the fallback, or returns no verdict, retry that claim once with a narrower prompt using the same profile/fallback sequence. If it still fails, report **Insufficient evidence** for that claim and include the failure reason. One failed investigation must not prevent the remaining claims from being checked.
+
+Complete this phase when every manifest claim has a returned investigator result — a verdict, or a documented **Insufficient evidence** fallback after retry.
 
 ## Step 5: Validate the Results
 

@@ -1,6 +1,6 @@
 ---
 name: merge-default-branch
-description: Merges the remote default branch into the current feature branch, delegates reported conflicts for intent-based resolution, validates the integration, and pushes the current branch. Use when asked to update, sync, or bring main/master into the current branch and push it. Not for: rebasing, merging a pull request, updating the default branch itself, or an already-conflicted merge/rebase.
+description: "Merges the remote default branch into the current feature branch, delegates reported conflicts for intent-based resolution, validates the integration, and pushes the current branch. Use when asked to update, sync, or bring main/master into the current branch and push it. Not for: rebasing, merging a pull request, updating the default branch itself, or an already-conflicted merge/rebase."
 argument-hint: "<optional remote or default-branch override>"
 disable-model-invocation: true
 ---
@@ -13,7 +13,7 @@ This is a user-invoked workflow because it fetches remote state, creates a norma
 
 ## 1. Establish the target and safe state
 
-Read repository and affected-path instructions, including `AGENTS.md`, compatible rules files, and documented validation commands.
+Read repository and affected-path instructions, including `AGENTS.md`, other agent-memory or instruction files that apply to the repository or changed paths (for example `CLAUDE.md` or a directory-scoped equivalent), and documented validation commands.
 
 Record the repository root, current branch, `HEAD`, worktree status, remotes, upstream, and any in-progress Git operation. Stop when outside a Git repository, on detached `HEAD`, on the remote default branch itself, or when a merge, rebase, cherry-pick, revert, or bisect is already active. If that active operation has unresolved merge or rebase paths, hand off to `resolving-merge-conflicts` as a separate workflow; never start this workflow around an existing operation.
 

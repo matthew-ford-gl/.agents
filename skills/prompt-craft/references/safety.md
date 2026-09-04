@@ -134,7 +134,7 @@ The layers are complementary: pattern matching is cheap and catches the explicit
 
 ## 6. Skill supply-chain security
 
-This section is the canonical evidence home consumed by skill-craft's REVIEW supply-chain checks.
+This section is the canonical evidence home consumed by skill-creator's REVIEW supply-chain checks.
 
 Agent skills (SKILL.md files plus bundled scripts) are a software supply-chain attack surface. From an analysis of 31,132 marketplace skills (2601.10338):
 

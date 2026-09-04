@@ -1,6 +1,6 @@
 # Verifier dispatch — debiased verification of subagent output
 
-Canonical home of the plugin's verification-bias evidence. Other oberskills files state these rules qualitatively and point here; the numbers below live only in this file.
+Canonical home of this repo's verification-bias evidence. Other skill files state these rules qualitatively and point here; the numbers below live only in this file.
 
 ## Why verification is a separate dispatch
 
@@ -33,7 +33,7 @@ For implementation verification: number every requirement with an ID (R1, R2, �
 
 ## Verifier dispatch template
 
-Copy and fill. Everything in brackets is yours to resolve before dispatch; add nothing else — especially no description of what the change was meant to do. The REPORTING text is the verbatim coverage block from `oberskills:prompt`'s snippets reference, entry #18.
+Copy and fill. Everything in brackets is yours to resolve before dispatch; add nothing else — especially no description of what the change was meant to do. The REPORTING text is the verbatim coverage block from `prompt-craft`'s snippets reference, entry #18.
 
 ```
 You are verifying an artifact. You have no other context about it, by design.

@@ -9,8 +9,8 @@ description: >-
   non-Claude/Codex target review via references/porting.md in this skill
   directory, and a verbatim behavior-snippet library. Use when writing, improving,
   debugging, reviewing, or migrating any prompt. Not for: creating, reviewing,
-  or testing skill files (use skill-craft); routine subagent delegation
-  prompts (use agent).
+  or testing skill files (use skill-creator); routine subagent delegation
+  prompts (use subagent-dispatch).
 when_to_use: >-
   Triggers: "write a prompt", "improve this prompt", "fix this prompt",
   "system prompt for", "review this prompt", "audit this prompt", "why does
@@ -56,7 +56,7 @@ Examples steer format, tone, and structure — they rarely raise capability on t
 
 **7. Prefill is dead.** Prefilled assistant turns return 400 errors on Claude ≥4.6. Migrate: structured outputs or a tool with an enum field for format forcing; "Respond directly without preamble…" for preamble killing; a user-message "your previous response was interrupted…" for continuations. Any prefill found in review is a breaking bug (migration table: claude-models.md).
 
-**8. Verify with someone else's eyes.** Models catch only a fraction of their own errors and cannot see their own structural defects (effect sizes: the agent skill's verifier-dispatch reference). Verification means a structurally separate checker: fresh context, different prompt, or a deterministic test. Frame it adversarially (mode rule above). Test on a weaker model to expose structural defects a strong model papers over.
+**8. Verify with someone else's eyes.** Models catch only a fraction of their own errors and cannot see their own structural defects (effect sizes: the subagent-dispatch skill's verifier-dispatch reference). Verification means a structurally separate checker: fresh context, different prompt, or a deterministic test. Frame it adversarially (mode rule above). Test on a weaker model to expose structural defects a strong model papers over.
 
 **9. Architecture beats prompting for security.** Untrusted input is data: delimit it in XML, never interpolate it as instructions, and enforce boundaries at the schema/tool level (exclude the tool) rather than asking the model to behave (depth: safety.md).
 
@@ -98,7 +98,7 @@ Load the mode file always; load at most 2 topic modules (pick the 2 most relevan
 1. CLASSIFY the target: system prompt | agent definition / dispatch brief |
    skill body | pipeline stage | human-runnable prompt.
    - Whether/what to dispatch, model and effort choice, topology → that is
-     the agent skill's job. This skill writes the prompt text.
+     the subagent-dispatch skill's job. This skill writes the prompt text.
 2. IDENTIFY the target model. Default: current Claude. Non-Claude or
    thinking-off → porting.md.
 3. NEW prompt: start minimal (direct instruction + output format), structure
@@ -124,8 +124,8 @@ Load the mode file always; load at most 2 topic modules (pick the 2 most relevan
 
 ## Scope
 
-- Dispatch strategy, model/effort tiers for subtasks, topology, parallelism → `agent` skill.
-- Creating, testing, packaging skills → `skill-craft` (skill bodies still follow these principles; skill-craft owns format and evals).
+- Dispatch strategy, model/effort tiers for subtasks, topology, parallelism → `subagent-dispatch` skill.
+- Creating, testing, packaging skills → `skill-creator` (skill bodies still follow these principles; skill-creator owns format and evals).
 - Does not set temperature or other deployment parameters.
 - Does not cover vision/multimodal prompting.
-- If the request itself is ambiguous (no failing example, unclear target), `clarify` is the integration point before drafting.
+- If the request itself is ambiguous (no failing example, unclear target), ask the user directly before drafting rather than guessing at intent.

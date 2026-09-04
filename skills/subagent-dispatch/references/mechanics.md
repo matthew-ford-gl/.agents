@@ -36,7 +36,7 @@ Because Explore and Plan skip CLAUDE.md and git status, restate any CLAUDE.md ru
 
 ## 3. Subagent frontmatter fields (canonical table)
 
-This is the plugin-canonical copy of the field list — other oberskills files point here instead of duplicating it. Only `name` and `description` are required.
+This is the canonical copy of the field list — other skill files in this repo point here instead of duplicating it. Only `name` and `description` are required.
 
 | Field | Notes |
 |---|---|

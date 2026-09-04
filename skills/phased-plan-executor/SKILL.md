@@ -2,14 +2,16 @@
 name: phased-plan-executor
 description: "Executes one phase of an already-written phased remediation plan (such as one produced by report-remediation-planner) by dispatching one parallel, worktree-isolated subagent per workstream in that phase, reconciling naming and file-overlap conflicts across their reports, then stopping for human approval before any merge, push to a shared branch, or new PR. Use when asked to work a specific phase of a phased plan doc, kick off a workstream batch, run the next phase of a remediation programme, or execute (not plan) a numbered phase. Not for: producing the plan itself (use report-remediation-planner), running more than one phase in a single invocation, or merging/pushing without review."
 argument-hint: "<plan file path> <phase number>"
-model: opus
+model: opus  # cross-agent conflict reconciliation (Step 4) needs stronger judgment than routine dispatch
 ---
 
 # Phased Plan Executor
 
 Input: `$ARGUMENTS` — a phased plan file path and a phase number.
 
-Execute exactly one phase of an already-written plan by fanning out one subagent per workstream in that phase. This skill never merges, pushes to a shared/main branch, or opens a PR — those steps always stop for a human, regardless of how small the change looks.
+Execute exactly one phase of an already-written plan by fanning out one subagent per workstream in that phase.
+
+**Standing boundary:** this skill never merges, never pushes to main or any shared branch, and never opens a new PR — those steps always stop for a human, regardless of how small the change looks. Every later reference to "the standing boundary" in this file means exactly this.
 
 ## Complexity contract
 
@@ -45,7 +47,7 @@ Each brief must carry, verbatim from the plan's own workstream entry:
 - the workstream's finding IDs, remediation shape, code boundary, and acceptance criteria;
 - any naming conventions carried over from Step 2.4;
 - the per-finding branch rule below;
-- the standing boundary: never merge, never push to main or any shared branch, never open a new PR.
+- the standing boundary (stated at the top of this file).
 
 **Per-finding branch rule**, inside every subagent's brief:
 
@@ -70,7 +72,7 @@ Complete when every finding in the phase has one status, every cross-agent confl
 
 Present, in this order: phase number and workstreams covered; per-finding status table; naming decisions made; file-overlap conflicts and their resolutions; proposed merge order; conventions carried forward for the next phase.
 
-Then stop. Merging any PR, pushing to main or a shared branch, and opening a new PR all require the human's explicit go-ahead, and must never happen automatically in this skill — not even for a one-line change.
+Then stop. The standing boundary from the top of this file applies here without exception — not even for a one-line change.
 
 Complete when the human has the full batch summary and nothing has been merged, pushed to a shared branch, or opened as a new PR without their approval.
 

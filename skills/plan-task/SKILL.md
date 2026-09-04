@@ -1,6 +1,6 @@
 ---
 name: plan-task
-description: Full planning-to-execution pipeline with active domain modelling, 3 parallel analysts, a 6-persona debate, a binding decision, ADR capture, and tracer-bullet ticket decomposition before Orchestrator implementation. One command from problem to PR.
+description: "Orchestrates the full planning-to-execution pipeline — active domain modelling, 3 parallel analysts, a 6-persona debate, a binding Director decision, ADR capture, and tracer-bullet ticket decomposition — before handing off to Orchestrator for implementation and PR. Use when a task needs full strategic vetting before code changes, e.g. cross-cutting features, architecturally significant changes, or anything where an unexamined approach is costly to get wrong. Not for: single-file fixes, typo/copy changes, or mechanical well-understood work — invoke `orchestrator` directly for those."
 argument-hint: "<task description or task file path>"
 model: opus
 ---
@@ -59,25 +59,22 @@ actually requires an ADR; do not draft one before the acceptance gate.
 
 ## Spawning mechanism
 
-Detect which runtime you are in and use its native mechanism for parallel agents —
-"Task"/"subagent" naming below is descriptive, not a literal tool name in every host.
+**Agent path resolution** (referenced later in this skill too): for any agent `<name>`,
+resolve its file by checking, in order, and using the first that exists:
+`.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
+`~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`.
 
-- **Claude Code**: spawn each custom persona as a `Task` tool call with `subagent_type` set to
-  its name. For task-scoped generic analysts that have no AGENT.md, use an unnamed/general
-  Task with the full analyst prompt and do not invent a `subagent_type`.
-- **Devin CLI**: spawn each agent with the `run_subagent` tool, `profile: "<name>"`,
-  `is_background: true` for every agent launched in the same phase, then collect each with
-  `read_subagent` (`block: true`) once all have been launched in that phase.
-  - **Profile fallback**: if a named profile is rejected as unrecognized (i.e. the agent
-    has an AGENT.md but no matching Devin CLI built-in profile), retry the same agent
-    using `profile: "subagent_general"` instead. Read the agent's AGENT.md file (using the
-    standard path resolution) and pass its full content as the `task` prompt, prefixed with
-    the original instructions you would have given. This ensures the agent still runs with
-    the correct persona — only the runtime profile differs.
-  - **Halt on failure**: if an agent fails to start even after the fallback attempt, STOP
-    and tell the human which agent(s) could not run and why. Do not continue with a partial
-    set — a missing discussion persona degrades the quality of the debate.
-- **Other hosts**: use whatever native parallel-subagent primitive is available.
+For runtime detection and how to launch parallel agents (Claude Code `Task` calls, Devin
+CLI `run_subagent` with profile-fallback and halt-on-failure, or another host's native
+primitive), resolve `orchestrator`'s file with the pattern above and follow its own
+"Spawning mechanism" section rather than a restatement here. If the host exposes the
+`subagent-dispatch` skill, its dispatch guidance applies equally to every parallel-launch
+step below.
+
+The one addition specific to this pipeline: the three Phase B analysts have no AGENT.md, so
+launch them as an unnamed/general Task (Claude Code) or with `profile: "subagent_general"`
+(Devin CLI) rather than a named `subagent_type`/profile. Named discussion personas (guardian,
+craftsman, pragmatist, architect, user-advocate, historian, director) use their own name.
 
 ## Phase B: Parallel Analysis (3 agents simultaneously)
 
@@ -105,28 +102,8 @@ These are task-scoped analyst prompts, not named custom personas and do not requ
 ## Phase C: Initial Implementation Plan (inline)
 
 Synthesise the three analyst outputs into an implementation plan. Do not spawn a subagent.
-
-```markdown
-# Implementation Plan — {task name}
-
-## Summary
-{2–3 sentences on what this change does and why}
-
-## Approach
-{Step-by-step implementation sequence}
-
-## Test-First Order
-{Reproduce the Test Strategy Analyst's table here verbatim}
-
-## Risks
-{Top 3 risks and mitigations from the Risk Analyst}
-
-## Monitoring
-{Post-deploy signals from the Impact Analyst}
-
-## Decision Records
-{Whether this is an ADR candidate, the decision that may need recording, and why; otherwise `None`}
-```
+Load `references/templates.md` (section "Phase C — Implementation Plan template") for the
+exact structure and fill it from the three analyst outputs.
 
 Save to `{task-slug}-implementation.md`.
 
@@ -163,13 +140,14 @@ Save to `{task-slug}-R2-{persona}.md` for each.
 
 Execute the Director binding decision inline — do not spawn a subagent.
 
-1. Resolve the Director's file by checking, in order, and using the first that exists:
-   `.devin/agents/director/AGENT.md` → `.claude/agents/director.md` →
-   `~/.agents/agents/director/AGENT.md` → `~/.claude/agents/director.md`. Read it for the DECISION.md schema
+1. Resolve the Director's file using the agent path-resolution pattern in the "Spawning
+   mechanism" section above, substituting `director` for `<name>`. Read it for the
+   DECISION.md schema.
 2. All 12 discussion outputs (R1 + R2) are already in context
-3. Apply the Director's complete decision framework, not only its output schema. A Guardian
-   Safety Veto is binding: the verdict must be `REJECT` or `DEFER`. Do not downgrade or
-   override it through majority opinion, schedule pressure, or inline synthesis.
+3. Apply the Director's complete decision framework exactly as its own AGENT.md defines it —
+   including its binding Safety Veto rule and decision-making framework. This skill executes
+   that framework inline instead of spawning a Director subagent; it does not re-derive,
+   downgrade, or override any part of it.
 4. Synthesise into a binding DECISION.md:
    - Verdict: `PROCEED` | `PROCEED WITH MODIFICATIONS` | `DEFER` | `REJECT`
    - Rationale referencing specific debate evidence
@@ -214,33 +192,8 @@ tickets to an external tracker before human acceptance.
 
 ## Phase H: Acceptance Gate — STOP
 
-Present the decision clearly to the human:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PLANNING COMPLETE — {task name}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Verdict: {PROCEED | PROCEED WITH MODIFICATIONS | DEFER | REJECT}
-
-{If PROCEED WITH MODIFICATIONS, list each modification as a bullet}
-
-Key risks identified:
-  {2–3 most significant risks from the debate}
-
-Test strategy: {n} tests across {layers} — see {task-slug}-DECISION.md for full table
-Tickets: {n} tracer-bullet tickets — see {task-slug}-tickets.md
-ADR: {required and decision summary | not required}
-
-Deferred: {anything explicitly out of scope}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Options:
-  [A] Accept — hand off to Orchestrator to implement
-  [R] Re-discuss — describe what you want reconsidered
-  [S] Stop here — take the plan and implement separately
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+Load `references/templates.md` (section "Phase H — Acceptance Gate presentation template"),
+fill it in, and present the decision clearly to the human.
 
 Wait for human response before proceeding.
 
@@ -271,42 +224,9 @@ substitute for an ADR when the Director required one.
 Invoke the Orchestrator using the Spawning mechanism above, with profile/subagent type
 `orchestrator`.
 
-Pass the following in the prompt:
-
-```
-PRE-APPROVED PLAN — skip step 3 and the human approval STOP.
-
-The following plan has been through a full 6-persona debate and has been accepted by the
-human. Treat it as the output of your step 3. Begin at step 4 (fan out plan-stage reviewers)
-and proceed through to PR.
-
-TASK:
-{original $ARGUMENTS}
-
-REFINED IMPLEMENTATION PLAN:
-{full contents of {task-slug}-implementation.md}
-
-BINDING DECISION:
-{full contents of {task-slug}-DECISION.md}
-
-COMPATIBILITY ANALYSIS:
-{full contents of {task-slug}-compatibility.md}
-
-TEST STRATEGY:
-{full contents of {task-slug}-test-strategy.md}
-
-IMPACT ANALYSIS:
-{full contents of {task-slug}-impact.md}
-
-TRACER-BULLET TICKETS:
-{full contents of {task-slug}-tickets.md}
-
-DOMAIN MODEL:
-{domain-modeller output and exact updated files, or `No active model change`}
-
-ARCHITECTURE DECISION RECORD:
-{new ADR path and full contents, or `Not required`}
-```
+Load `references/templates.md` (section "Phase J — Orchestrator handoff prompt template"),
+fill in every placeholder from the artifacts produced in earlier phases, and pass the result
+as the prompt.
 
 The Orchestrator must execute tickets in dependency order and invoke the `tdd` skill for each
 implementation slice. Ticket boundaries guide sequencing but do not permit separate PRs unless

@@ -1,8 +1,8 @@
 ---
 name: tdd
-description: Test-driven development through public seams using one red-green-refactor vertical slice at a time. Use when implementing a feature or bug fix test-first, when the user mentions TDD or red-green-refactor, or when an approved test strategy must be executed.
+description: "Drives test-driven development through public seams using one red-green-refactor vertical slice at a time. Use when implementing a feature or bug fix test-first, when the user mentions TDD or red-green-refactor, or when an approved test strategy must be executed. Not for: fixing already-failing tests, exploratory/non-TDD test writing, or triaging flaky tests."
 argument-hint: "<feature or fix slice>"
-model: sonnet
+model: sonnet  # bounded, procedural red-green-refactor execution against an already-approved strategy; no multi-agent synthesis needed
 ---
 
 # Test-Driven Development

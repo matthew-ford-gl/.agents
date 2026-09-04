@@ -1,8 +1,8 @@
 ---
 name: review-plans
-description: Run two adversarial agents against an implementation plan — one trying to find fatal flaws, one checking feasibility against the actual codebase. Use before committing to implementation when you want a hostile review, not a constructive one.
+description: "Run two adversarial agents against an implementation plan — one trying to find fatal flaws, one checking feasibility against the actual codebase. Use before committing to implementation when you want a hostile review, not a constructive one. Not for: constructive plan debate or persona-based feasibility discussion (use plan-task)."
 argument-hint: "<path to implementation plan or task description>"
-model: sonnet
+model: sonnet  # sonnet's reasoning is sufficient for adversarial critique; no need for Opus-level cost
 ---
 You are running an adversarial review of an implementation plan.
 
@@ -28,6 +28,8 @@ Before launching reviewers, load the project-specific context:
 Also read the relevant source files mentioned in the plan so both agents have codebase context.
 
 Pass all loaded project context to the agents you spawn.
+
+Complete when plan and project context are loaded.
 
 ---
 

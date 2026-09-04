@@ -4,7 +4,7 @@ Copy-paste-ready behavior blocks from Anthropic's current prompting docs. DESIGN
 
 Sources: **S2** = Prompting best practices (platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices) · **S3** = Prompting Claude Fable 5 (…/prompting-claude-fable-5) · **S4** = Prompting Claude Opus 4.8 (…/prompting-claude-opus-4-8) · **S5** = Prompting Claude Opus 5 (…/prompting-claude-opus-5, fetched 2026-07-24).
 
-Ownership note: the when-to-delegate snippet and effort-scaling guidance belong to the agent skill — not duplicated here.
+Ownership note: the when-to-delegate snippet and effort-scaling guidance belong to the subagent-dispatch skill — not duplicated here.
 
 ## Contents
 

@@ -1,8 +1,8 @@
 ---
 name: verify-fix
-description: Verify that a bug fix is complete — confirms the root cause is addressed, checks for partial fixes, and detects regressions introduced by the change. Run after implementing a fix but before raising a PR.
+description: "Verifies that a bug fix is complete — confirms the root cause is addressed, checks for partial fixes, and detects regressions introduced by the change. Use when a fix has just been implemented and needs correctness confirmation before a PR. Not for: code-quality review (use code-review)."
 argument-hint: "<ROOT-CAUSE.md path or bug description> [--diff <diff or PR>]"
-model: sonnet
+model: sonnet  # spawns 3 verification agents requiring strong multi-step reasoning; not a mechanical/low-effort task suited to a lighter model
 ---
 You are verifying that a bug fix is complete and correct.
 

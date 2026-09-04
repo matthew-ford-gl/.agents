@@ -1,8 +1,8 @@
 ---
 name: analyse-bug
-description: Root cause analysis pipeline for a bug. Runs structured investigation phases — intake, correlation, hypothesis ranking, evidence classification, multi-persona discussion — and writes a ROOT-CAUSE.md only when the primary hypothesis reaches live-data confirmation.
+description: "Root cause analysis pipeline for a bug. Runs structured investigation phases — intake, correlation, hypothesis ranking, evidence classification, multi-persona discussion — and writes a ROOT-CAUSE.md only when the primary hypothesis reaches live-data confirmation. Use when a bug ticket, symptom, or regression needs root-causing before a fix. Not for: greenfield feature design, or pure investigate-repo lookups with no fix intent."
 argument-hint: "<bug description, ticket ID, or symptom>"
-model: opus
+model: opus  # multi-persona debate and evidence-weighted root-cause synthesis need stronger reasoning than routine tasks
 ---
 You are running a structured root cause analysis pipeline for a bug.
 
@@ -89,6 +89,10 @@ Trace the request flow from symptom back to root cause.
 - Assign an evidence classification (see below)
 - Write the specific live-data query that would confirm or eliminate it
 
+Save this ranked hypothesis list to `bugs/{id}/hypotheses.md` (see Output Artifacts).
+This is the single artifact for hypothesis tracking — Phase 3b and 3c update it in place
+rather than creating additional files.
+
 ---
 
 ## Evidence Classification (assign to every hypothesis)
@@ -106,35 +110,9 @@ Trace the request flow from symptom back to root cause.
 
 ## Phase 3b: Evidence Request (when primary hypothesis is CODE_ONLY)
 
-Output a structured evidence checklist ordered by elimination power:
-
-```
-## Evidence needed — {bug description}
-
-I have ranked {N} hypotheses from code analysis. To confirm or eliminate them I need
-live data. Provide any subset — I will update the analysis with whatever you share.
-
-### Fastest (eliminates most hypotheses)
-
-[ ] {What to check}
-    Query: {exact DB query, log search, or API call to run}
-    Interpret: If result is X → confirms Hypothesis A, eliminates B and C
-               If result is Y → rules out A, investigate B next
-
-### Medium effort
-
-[ ] {What to check}
-    Query: {exact query}
-    Interpret: {what each result means}
-
-### Slower (only if above are inconclusive)
-
-[ ] {What to check}
-    Query: {exact query}
-    Interpret: {what each result means}
-
-Share any of the above and I will re-run the analysis with the new evidence.
-```
+Load the template at `assets/templates/evidence-checklist.md` and fill it in, ordering
+items by elimination power. Append the filled-in checklist to `bugs/{id}/hypotheses.md`
+(see Output Artifacts) rather than creating a separate file.
 
 **Stop and wait for data. Do not speculate further or write ROOT-CAUSE.md.**
 
@@ -172,60 +150,16 @@ The discussion should be concise — its job is to validate the fix direction, n
 
 Only write this when the primary hypothesis is `LOG_CONFIRMED` or `MULTI_SOURCE`.
 
-```markdown
-# ROOT-CAUSE — {bug description}
-
-**Classification**: CODE | CONFIG | DEPLOYMENT | DATA | ENVIRONMENT
-**Confidence**: {percentage} ({evidence level})
-**Components affected**: {list}
-
-## Symptom
-{What the user experienced — one paragraph, plain language}
-
-## Evidence Chain
-{Ordered list — each item labelled with its source and value}
-1. [CODE] {file}:{line} — {what it shows}
-2. [DB] Query result: {field} = {value} — {what it means}
-3. [LOG] {log field}: {value} — {what it proves}
-
-## Root Cause
-{The mechanism in one paragraph. Causal chain, plain language, no code snippets.}
-
-## Fix
-{What needs to change and where. Distinguish code change vs config change vs data fix.}
-
-## Verification
-{Specific query or check to confirm the fix is working after deployment}
-
-## Regression Test
-{What automated test should be added to prevent recurrence}
-```
+Load the template at `assets/templates/root-cause-template.md`, fill it in, and save it
+to `bugs/{id}/ROOT-CAUSE.md`.
 
 ---
 
 ## Phase 6: Fix Handoff — STOP
 
-Present the ROOT-CAUSE.md summary and offer to proceed to implementation:
+Present the ROOT-CAUSE.md summary and offer to proceed to implementation.
 
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ROOT CAUSE CONFIRMED — {bug description}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Classification: {CODE | CONFIG | DATA | DEPLOYMENT}
-Confidence:     {%} ({evidence level})
-Components:     {list}
-
-Root cause: {one sentence plain-language summary}
-
-Fix required: {code change / config change / data fix}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Options:
-  [F] Fix — hand off to Orchestrator to implement and raise a PR
-  [S] Stop — take the ROOT-CAUSE.md and implement separately
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+Load the template at `assets/templates/stop-box.md`, fill it in, and print it verbatim.
 
 Wait for human response before proceeding.
 
@@ -316,9 +250,8 @@ Pass the bug ID or description as context so it can locate the investigation art
 ## Output Artifacts
 
 Save to `bugs/{id}/` (or create a timestamped folder if no ID):
-- `intake.md` — symptom, blast radius, reproduction steps
-- `hypotheses.md` — ranked hypothesis list with evidence classification
-- `PRELIMINARY-ANALYSIS.md` — written after Phase 3 (hypotheses + evidence requests if `CODE_ONLY`)
-- `ROOT-CAUSE.md` — written only after `LOG_CONFIRMED`
-
-**PRELIMINARY-ANALYSIS.md is always written after Phase 3**, regardless of confidence level.
+- `intake.md` — symptom, blast radius, reproduction steps (written after Phase 1)
+- `hypotheses.md` — ranked hypothesis list with evidence classification, written after Phase 3;
+  updated in place with the evidence checklist (Phase 3b) and re-classified hypotheses
+  (Phase 3c) as new data arrives
+- `ROOT-CAUSE.md` — written only after the primary hypothesis reaches `LOG_CONFIRMED` or `MULTI_SOURCE`

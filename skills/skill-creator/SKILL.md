@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create, revise, evaluate, and improve Devin or Claude Code skills and reusable agent workflows. Use whenever a user asks to make, update, refactor, test, benchmark, troubleshoot, or improve the triggering of a SKILL.md or reusable agent definition.
+description: "Create, revise, evaluate, and improve Devin or Claude Code skills and reusable agent workflows. Use whenever a user asks to make, update, refactor, test, benchmark, troubleshoot, or improve the triggering of a SKILL.md or reusable agent definition. Not for: read-only auditing of an existing skill library without intent to revise (use skill-reviewer)."
 argument-hint: "<skill creation or improvement task>"
 model: sonnet
 ---
@@ -22,6 +22,8 @@ Before building, confirm the skill is worth the context cost:
 - Deterministic, repeated computation? Use a script bundled in the skill, not prose.
 - Guaranteed enforcement on every event? Use a hook or gate, not a skill.
 
+Complete this phase when every question above has an explicit answer and the answers justify building or revising a skill rather than doing the task inline, using passive context, or using a hook.
+
 ## 1. Choose the artifact
 
 | You need | Build | Why |
@@ -32,6 +34,8 @@ Before building, confirm the skill is worth the context cost:
 | Work that floods the main context (logs, search results, bulk reads) | **Subagent** | Isolation: explore in a separate window, return a distilled summary. |
 | Always-relevant, small project facts | **AGENTS.md / CLAUDE.md** | Passive context is consistently available. |
 | Both reusable instructions and isolation | Skill + fork/subagent dispatch | Use a brief, actionable prompt only. |
+
+Complete this phase when one row of the table is selected and matches the capability, invocation, and isolation needs captured so far.
 
 ## 2. Locate the target and governing conventions
 
@@ -131,42 +135,13 @@ Complete this phase when an agent can follow the draft without inferring missing
 
 ## 6. Evaluate
 
-Adapt evaluation depth to the task and user preference.
-
-### Baseline-first approach
-
-1. Write the `evals.json` or eval plan before improving the skill.
-2. Run the task once without the new skill (baseline) and capture specific failures.
-3. The baseline failures are the spec for the skill.
-4. After drafting, run the same prompts with the skill and compare.
-5. Iterate until the with-skill run beats baseline on the gap assertions.
+Adapt evaluation depth to the task and user preference. Load `references/evaluate.md` for the step-by-step procedure: its "Baseline-first approach" section for rigorous gap-driven validation, "Lightweight review" for small or subjective skills, or "Comparative evaluation" for objectively testable or consequential skills.
 
 If the host provides skill-evaluation tools (e.g., `skill-eval:validate_skill`, `test_triggers`, `run_eval`), use them for validation, trigger testing, and grading. On hosts without those tools, perform the equivalent checks manually:
 
 - Validate frontmatter is well-formed and the `name` matches the directory.
 - Probe the description with should-trigger and should-not-trigger phrases.
 - Run the core prompts and check outputs against the eval assertions.
-
-### Lightweight review
-
-For small or subjective skills:
-
-1. Create 2–3 realistic prompts covering the main path and an important edge case.
-2. Trace whether the description triggers appropriately.
-3. Trace each prompt through the workflow.
-4. Review outputs or expected behavior with the user when judgment is subjective.
-
-### Comparative evaluation
-
-For objectively testable or consequential skills:
-
-1. Define representative prompts and expected results before running them.
-2. For a new skill, compare runs with the skill against runs without it.
-3. For an existing skill, snapshot the old version and compare it against the revision.
-4. Launch independent runs in parallel when the host supports subagents.
-5. Use objective assertions for machine-checkable properties and human review for subjective quality.
-6. Record pass/fail evidence, errors, token or timing data when available, and qualitative feedback.
-7. Summarize discriminating improvements, regressions, variance, and cost trade-offs.
 
 Keep evaluation artifacts outside the installed skill tree. Resolve the host operating system's temporary directory and use `<temp>/<skill-name>-workspace/iteration-N/`; remove artifacts created for the run before finishing unless the user asks to preserve them. If the host has no writable temporary directory, ask the user where to place them rather than creating a sibling workspace. Do not require upstream scripts, graders, or viewers that are absent from the installed skill; use available host tools and clearly report any omitted metric.
 
