@@ -259,7 +259,31 @@ Detect which runtime you are in and use its native mechanism for parallel review
      - Rollback conditions (from DECISION.md if present)
    - Report the PR URL.
 
-10. **Final report to the caller — always include reviewer verdicts.**
+10. **Drive the new PR to green using `land-pr`.** This is what takes the run from an opened
+    PR to a green one instead of stopping at step 9.
+
+    `land-pr` has `disable-model-invocation: true`, so it cannot be invoked via the Skill
+    tool from here (same constraint the skill itself documents for `merge-default-branch`).
+    Resolve `skills/land-pr/SKILL.md` using project-before-user precedence (repo-local
+    `.claude/skills/land-pr/SKILL.md` before `~/.claude/skills/land-pr/SKILL.md` /
+    `~/.agents/skills/land-pr/SKILL.md`) and follow its phases directly against the PR you
+    just opened, staying within the authorization this orchestrator run already has to
+    commit, push, and requeue CI on this PR's own branch:
+
+    - Skip its Phase 2/3 (branch sync) — already satisfied by step 9; the branch was just
+      created off the mandated base.
+    - Run its Phase 4 (fetch review state), Phase 5 (resolve open threads — likely none yet
+      on a fresh PR, but re-check), Phase 6 (investigate and fix CI, including requeuing
+      expired/stale checks), and Phase 7 (verify full approval), using the matching
+      `references/github.md` or `references/azure-devops.md` file for platform mechanics.
+    - Re-run the full local validation gate (step 7a) after any fix pushed during this phase.
+    - Stop at its Phase 8 verdict: **READY TO MERGE**, **BLOCKED — waiting on others** (e.g.
+      no reviewer has looked yet — expected right after opening a PR), or **BLOCKED — human
+      decision needed**. Never merge or complete the PR yourself. If CI is still pending after
+      one pass, report it as in-progress and suggest the human wrap continued checking with
+      `/loop <interval> /land-pr <PR>` rather than polling indefinitely in this run.
+
+11. **Final report to the caller — always include reviewer verdicts.**
 
     Your terminal message back to whoever invoked you (human or parent skill/agent) is the
     only record they will have of this run. This matters most when you were launched as a
@@ -276,6 +300,8 @@ Detect which runtime you are in and use its native mechanism for parallel review
     - Any reviewer that could not run (e.g. unrecognized profile) — name it and say so;
       do not silently absorb its persona into your own reasoning as a substitute.
     - CI/test gate status (from step 7a).
+    - **land-pr verdict from step 10**: READY TO MERGE / BLOCKED, with CI and approval state
+      and any outstanding blockers exactly as `land-pr`'s own Phase 8/9 would report them.
     - Any self-flagged caveats or deferred items.
     - The PR URL.
 
