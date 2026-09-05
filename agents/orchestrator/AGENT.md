@@ -276,6 +276,8 @@ Detect which runtime you are in and use its native mechanism for parallel review
       on a fresh PR, but re-check), Phase 6 (investigate and fix CI, including requeuing
       expired/stale checks), and Phase 7 (verify full approval), using the matching
       `references/github.md` or `references/azure-devops.md` file for platform mechanics.
+      Phases 5 and 6 dispatch `pr-fixer` and `code-reviewer` as their own fix-review loop
+      per `land-pr`'s own instructions — follow that dispatch, do not author the fix yourself.
     - Re-run the full local validation gate (step 7a) after any fix pushed during this phase.
     - Stop at its Phase 8 verdict: **READY TO MERGE**, **BLOCKED — waiting on others** (e.g.
       no reviewer has looked yet — expected right after opening a PR), or **BLOCKED — human

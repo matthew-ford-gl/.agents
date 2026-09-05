@@ -25,18 +25,19 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 | `architect` | Discussion | Principal Architect. Reviews service boundaries, data ownership, coupling, abstraction correctness, and evolution risk. | sonnet / sonnet | read-only |
 | `user-advocate` | Discussion | End-user perspective. Traces user journeys, edge cases, and accidental complexity in the UX. | sonnet / sonnet | read-only |
 | `historian` | Discussion | Institutional memory guardian. Cross-references plans against git history, past incidents, and documented patterns. | sonnet / sonnet | read-only + exec |
-| `code-reviewer` | Diff | Reviews the concrete diff against the approved plan for bugs, plan-drift, and standard violations. | swe / haiku | read-only |
+| `code-reviewer` | Diff | Reviews the concrete diff against the approved plan for bugs, plan-drift, and standard violations. | sonnet / sonnet | read-only |
 | `backwards-compatibility-reviewer` | Diff | Checks upgrade and mixed-version safety across public APIs, schemas, persisted data, configuration, CLI contracts, events, integrations, deployment ordering, and rollback. | sonnet / sonnet | read-only |
 | `accessibility-reviewer` | Plan & Diff | Conditional reviewer for UI changes. Checks WCAG 2.2 Level AA, keyboard operability, ARIA, and touch targets. | swe / haiku | read-only |
 | `dependency-reviewer` | Plan & Diff | Conditional reviewer for package changes. Checks supply chain, maintenance, license, necessity, transitive deps, and CVEs. | swe / haiku | read-only + web_search |
 | `migration-reviewer` | Plan & Diff | Conditional reviewer for schema and data migrations. Checks zero-downtime compatibility, sequencing, rollback, and scale. | sonnet / sonnet | read-only |
 | `observability-reviewer` | Diff | Verifies new code paths have structured logging, metrics, tracing, and production-debuggable signals. | swe / haiku | read-only |
 | `performance-reviewer` | Diff | Checks for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, and memory leaks. | swe / haiku | read-only |
-| `requirements-compliance` | Diff | Checks whether a code diff faithfully and completely implements the originating issue, spec, or acceptance criteria. Finds requirement gaps, bad assumptions, incomplete implementation, and scope creep. | swe / haiku | read-only |
+| `requirements-compliance` | Diff | Checks whether a code diff faithfully and completely implements the originating issue, spec, or acceptance criteria. Finds requirement gaps, bad assumptions, incomplete implementation, and scope creep. | sonnet / sonnet | read-only |
 | `quality-auditor` | Utility | Standalone SOLID/naming/complexity/clean-code auditor. Invoked once per file chunk in parallel by `/quality-audit`; each pass covers every dimension for its own chunk only. | swe / haiku | read-only |
 | `repo-investigator` | Investigation | Tests one bounded repository claim, traces production reachability, and returns an evidence-backed verdict with explicit uncertainty. | sonnet / sonnet | read-only + exec |
 | `docs-updater` | Utility | Keeps `/docs` folder files in sync with current code, API contracts, and CLI flags. | swe / haiku | read/edit/write/exec |
 | `domain-modeller` | Modelling | Actively sharpens domain language, rules, boundaries, and lifecycles through edge-case scenarios, then records crystallised glossary entries and decisions. | sonnet / sonnet | read/edit/write |
+| `pr-fixer` | Utility | Dispatched by `land-pr` to implement fixes for review-thread feedback and CI failures. Never commits or pushes — `land-pr` gates its output through `code-reviewer` and the local validation gate first. | sonnet / sonnet | read/edit/write/exec |
 
 ### Tool Access
 
@@ -72,7 +73,7 @@ Skills are reusable workflows and guidance modules. Some are user-invoked top-le
 | `/analyse-bug` | `<bug description>` | Structured root cause analysis pipeline. Correlates live data, ranks hypotheses, runs a multi-persona discussion, and writes `ROOT-CAUSE.md` only after live-data confirmation. |
 | `/verify-fix` | `<ROOT-CAUSE.md> [--diff <diff>]` | Post-implementation verification. Confirms the root cause is addressed, checks for partial fixes, and detects regressions. |
 | `/review-pr` | `<PR URL>` | PR review against requirements, coding standards, and backwards compatibility. Checks upgrade paths, mixed-version deployments, public contracts, persisted data, migration/versioning obligations, and rollback safety before presenting a consolidated PASS/FAIL verdict. |
-| `/land-pr` | `<PR number or URL>` | Drives a PR to merge-ready: syncs with the default branch, resolves every review thread, investigates and fixes failing/expired CI checks, and loops until every thread is resolved and the required reviewer's vote is a full approval. Never merges — hands off a clean PR for the user to complete. |
+| `/land-pr` | `<PR number or URL>` | Drives a PR to merge-ready: syncs with the default branch, resolves every review thread, investigates and fixes failing/expired CI checks, and loops until every thread is resolved and the required reviewer's vote is a full approval. Coordinates state itself (sonnet) and dispatches `pr-fixer` for the actual fixes, gated by `code-reviewer`, before committing or pushing. Never merges — hands off a clean PR for the user to complete. |
 | `/review-plans` | `<plan file>` | Adversarial review. Two agents independently attack the plan for fatal flaws and feasibility gaps against the actual codebase. |
 | `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |

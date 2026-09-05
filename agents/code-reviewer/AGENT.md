@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Diff-stage reviewer — reviews the concrete diff against the approved plan, catching plan-drift, bugs, and standards violations. Focuses on what only a diff can reveal, not approach decisions already vetted at plan stage.
-model: swe
+model: sonnet
 allowed-tools:
   - read
   - grep
