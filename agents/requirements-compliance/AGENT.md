@@ -1,7 +1,7 @@
 ---
 name: requirements-compliance
 description: Diff-stage reviewer — checks whether a code diff faithfully and completely implements the originating issue, spec, or acceptance criteria. Finds requirement gaps, bad assumptions, incomplete implementation, and scope creep. Returns APPROVED or BLOCKED.
-model: swe
+model: sonnet
 allowed-tools:
   - read
   - grep

@@ -3,6 +3,7 @@ name: land-pr
 description: "Takes a PR number or URL (GitHub or Azure DevOps), brings the branch up to date with the default branch, resolves every open review thread with a code fix or reply, investigates and fixes failing CI checks, requeues expired or stale builds, and repeats until every thread is resolved, CI is green, and the required reviewer's vote is a full approval — not 'approved with suggestions'. Stops short of merging. Use when asked to get a PR ready to merge, babysit a PR, drive PR feedback and CI failures to zero, or land/finish a PR end-to-end. Not for: opening a brand-new PR (use ship), a one-off static compliance review with no fix loop (use review-pr), or merging/completing the PR itself (always left to the user)."
 argument-hint: "<PR number or URL (GitHub or Azure DevOps)>"
 disable-model-invocation: true
+model: sonnet  # coordinator role only — classifies state and drives phase transitions; actual fix-authoring is dispatched to pr-fixer (sonnet, write-capable) and gated by code-reviewer
 ---
 
 # Land PR
@@ -19,6 +20,32 @@ Repeat Phases 4-8 each time you're invoked (this skill is idempotent: it re-read
 rather than assuming anything from a previous pass). For long unattended monitoring beyond a
 single pass, tell the user to wrap this skill with `/loop`, e.g. `/loop 10m /land-pr <PR>`,
 rather than sleeping inside one invocation for hours.
+
+## Role split
+
+You (the coordinator) own state: fetching review/CI status, classifying threads and check
+failures, deciding what happens next, and every commit/push/reply/resolve/requeue action.
+You never author a code fix yourself — Phases 5 and 6 dispatch `pr-fixer` for that, then gate
+its output through `code-reviewer` and your local validation gate before anything is committed
+or pushed. This keeps exactly one writer touching the branch at a time and keeps a bad fix from
+ever reaching a live thread reply or a pushed commit.
+
+**Path resolution** — for `pr-fixer`, `code-reviewer`, and the `test-failure-triager` skill,
+resolve in order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
+`~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md` (agents); for the skill,
+`.devin/skills/test-failure-triager/SKILL.md` → `.claude/skills/test-failure-triager/SKILL.md` →
+`~/.agents/skills/test-failure-triager/SKILL.md` → `~/.claude/skills/test-failure-triager/SKILL.md`.
+
+**Spawning `pr-fixer` / `code-reviewer`** — same runtime-native mechanism `orchestrator`
+documents for its reviewers (Claude Code: `Task`/`Agent` with `subagent_type` set to the
+agent's `name`; Devin CLI: `run_subagent` with `profile: "<name>"`, falling back to
+`subagent_general` with the resolved `AGENT.md` content as the prompt if the profile is
+unrecognized). Always pass file *content*, not paths: the diff, the thread/check evidence,
+and any standards/playbooks loaded in Phase 0.
+
+**`test-failure-triager` is invoked as a skill, not a subagent** — it has no `model:` field,
+so it runs inline in your own context rather than as a separate dispatch. Use it, don't
+re-derive its classification rules; copying them here would drift from the source.
 
 ---
 
@@ -88,16 +115,37 @@ Complete when all four are captured for the current state of the PR (not a cache
 
 ## Phase 5: Resolve every open comment thread
 
-For each thread that is not already resolved:
+For each thread that is not already resolved, **classify** it: a concrete actionable
+code-change request, a question/discussion, a nit, or a point you disagree with.
 
-1. **Classify** it: a concrete actionable code-change request, a question/discussion, a nit, or a point you disagree with.
-2. **Actionable**: implement the fix. Commit with a message describing the fix (see attribution rule below). Reply on the thread summarising what changed and referencing the commit. Resolve the thread.
-3. **Question/nit** you can satisfy by inspection or a trivial change: answer or fix, reply, resolve.
-4. **Disagreement or genuinely ambiguous request**: reply with your reasoning, but **do not resolve the thread** — leave it open and record it as a human-decision blocker for the final report. Never resolve a thread you're not confident is actually addressed.
+- **Question/nit** you can satisfy by inspection with no code change: answer, reply, resolve
+  directly — no need to involve `pr-fixer` for a reply-only thread.
+- **Disagreement or genuinely ambiguous request**: reply with your reasoning, but **do not
+  resolve the thread** — leave it open and record it as a human-decision blocker for the
+  final report. Never resolve a thread you're not confident is actually addressed.
+- **Actionable** (needs a code change): batch every actionable thread from this pass and
+  run the fix-review loop below once for the whole batch.
+
+**Fix-review loop** (actionable threads):
+
+1. Dispatch `pr-fixer` with the full comment history and files for every actionable thread
+   in the batch, the current diff, and any standards/playbooks loaded in Phase 0. It returns
+   working-tree changes plus a drafted reply per thread — it does not commit, push, reply, or
+   resolve.
+2. Run the project's build/lint/test commands (from `AGENTS.md` or standard tooling) against
+   the working tree.
+3. Dispatch `code-reviewer` against the resulting diff.
+4. If `code-reviewer` returns BLOCKED or lists Must-fix items: re-dispatch `pr-fixer` with
+   its feedback as the priority item, and repeat from step 2. Track attempts for this batch;
+   after 3 failed loop attempts, stop, leave the working tree as-is, and record every thread
+   still unaddressed as a blocker with what was tried.
+5. Once the gate passes and `code-reviewer` returns APPROVED (or only nits): commit using the
+   attribution convention below, reply on each addressed thread with `pr-fixer`'s drafted
+   text (summarising what changed and referencing the commit), and resolve it.
 
 Commit-attribution convention: if the repository's or user's global instructions specify one, use it exactly. Otherwise use a generic `Generated with [tool name]` line with a matching `Co-Authored-By:` for your own host/runtime — never hardcode another runtime's convention.
 
-After all fixable threads are handled, run the project's build/lint/test commands (from `AGENTS.md` or standard tooling) before pushing. Push commits normally (no force) to the PR branch.
+Push commits normally (no force) to the PR branch once the batch is committed.
 
 Complete when every thread is either resolved-with-a-reply or explicitly recorded as a human-decision blocker, and any resulting commits are pushed.
 
@@ -107,11 +155,24 @@ Complete when every thread is either resolved-with-a-reply or explicitly recorde
 
 For every required check/policy that is not green:
 
-- **Expired or stale** (timed out waiting to run, or a merge-policy build that expired): requeue it using the matching reference file's commands.
-- **Failed**: pull its logs. Classify the failure the way `test-failure-triager` classifies test failures — production bug, test bug, flake, or infrastructure/environment issue — using actual evidence (logs, the diff, re-running in isolation), not a guess. Fix the root cause (code, test, or config), commit, and push. Track attempts per distinct check; after 3 failed fix attempts on the same check, stop trying and record it as a blocker with what you tried and why it didn't resolve.
-- **Pending/running**: poll with backoff (e.g. every 1-2 minutes) for up to roughly 10-15 minutes this pass. If it's still not finished after that, stop polling and report it as "in progress" rather than blocking the session further — recommend `/loop` for continued unattended checking.
-
-Re-run the changed check(s) after any fix and confirm before moving on.
+- **Expired or stale** (timed out waiting to run, or a merge-policy build that expired):
+  requeue it directly using the matching reference file's commands — no fix authoring needed.
+- **Pending/running**: poll with backoff (e.g. every 1-2 minutes) for up to roughly 10-15
+  minutes this pass. If it's still not finished after that, stop polling and report it as
+  "in progress" rather than blocking the session further — recommend `/loop` for continued
+  unattended checking.
+- **Failed**: pull its logs, then invoke the `test-failure-triager` skill (see Path
+  resolution above) with those logs and the diff to classify it — production bug, test bug,
+  flake, or infrastructure/environment issue — using actual evidence, not a guess.
+  - **Flake**: re-run/requeue it directly; no fix authoring.
+  - **Production bug / test bug / fixable infra or config issue**: batch it with every other
+    fixable failing check from this pass and run the same fix-review loop as Phase 5 —
+    dispatch `pr-fixer` with the logs and classification for the batch, run the local gate,
+    dispatch `code-reviewer`, loop on BLOCKED. Track attempts per distinct check; after 3
+    failed loop attempts on the same check, stop trying it and record it as a blocker with
+    what was tried and why it didn't resolve.
+  - Once the gate and `code-reviewer` both pass: commit (attribution convention above), push,
+    and re-run the affected remote check(s) to confirm.
 
 Complete when every required check is green, or every non-green check is explicitly classified as in-progress or a blocker with reasoning.
 
