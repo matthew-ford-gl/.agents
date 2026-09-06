@@ -47,6 +47,13 @@ and any standards/playbooks loaded in Phase 0.
 so it runs inline in your own context rather than as a separate dispatch. Use it, don't
 re-derive its classification rules; copying them here would drift from the source.
 
+**Commit verification** — after every `git commit` in Phases 3, 5, or 6, run
+`git log -1 --stat` before pushing and confirm the expected files actually appear in it. A
+pre-commit hook can fail silently on a broken local toolchain and leave `HEAD` pointing at a
+stale or empty commit; pushing that would land a broken change with no code to show for it.
+If the commit doesn't contain what you expect, stop and fix the toolchain issue rather than
+retrying the push.
+
 ---
 
 ## Phase 0: Load project context
