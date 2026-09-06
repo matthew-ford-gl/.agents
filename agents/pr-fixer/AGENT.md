@@ -56,6 +56,10 @@ in the batch.
 - Stay within the scope of the batch. Do not fix unrelated pre-existing issues you notice
   in passing — report them instead.
 - Match existing code style and conventions in the files you touch.
+- Before adding a new helper, abstraction, or test utility, grep the codebase for an
+  existing one covering the same need (e.g. a metrics/telemetry recorder, a test fixture,
+  a formatting helper) and reuse it instead of introducing a parallel implementation. Only
+  add a new one if nothing existing covers the need.
 - Run the project's relevant local validation (build/lint/test for the files you changed)
   before returning, and report the result. `land-pr` re-runs the full gate afterward
   regardless.

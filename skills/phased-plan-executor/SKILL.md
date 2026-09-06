@@ -51,6 +51,9 @@ Each brief must carry, verbatim from the plan's own workstream entry:
 
 **Per-finding branch rule**, inside every subagent's brief:
 
+- Before touching anything, check `git rev-parse --is-shallow-repository`; if true, run
+  `git fetch --unshallow origin <branch>` first. A shallow clone can make a stale base look
+  like a genuine conflict or revert hazard, producing a false-positive finding.
 - If a finding carries a linked PR: verify that PR's actual source branch via the repository host's PR-query command before touching anything — never assume the currently checked-out branch matches the PR. Check out that branch, patch in place, and push only to that PR's own branch.
 - If a finding has no linked PR: branch fresh off main, implement, test against the finding's acceptance criteria, and commit. Do not push.
 
