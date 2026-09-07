@@ -82,11 +82,22 @@ Complete when `platform` and every identifier needed for later phases are set.
 
 ## Phase 2: Sync the local branch safely
 
+This phase operates **in place**, in whichever folder this skill was invoked from — including
+a git worktree folder. Switch that folder's checked-out branch to the PR's source branch; never
+`git clone` a fresh copy of the repo and never create a new worktree (e.g. `git worktree add`,
+`EnterWorktree`) to work in instead. A worktree folder is reused across PRs by changing which
+branch it has checked out, not by spinning up another folder per PR.
+
 Record the repository root, current branch, and worktree status. Require a clean index and worktree — no uncommitted changes, no untracked paths that a checkout could overwrite. If dirty, stop and ask the user to commit or stash first; never stash or discard automatically.
 
 Check out the PR's source branch locally (`gh pr checkout <number>`, or for ADO fetch the source branch named in `az repos pr show` and check it out). Stop if the checkout would overwrite local work.
 
-Complete when the PR's source branch is checked out locally with a clean worktree.
+If git refuses the checkout because the branch is already checked out in another worktree
+(`fatal: '<branch>' is already checked out at '<path>'`), that other worktree is a separate
+in-progress checkout — do not force it or delete that worktree. Tell the user about the
+conflicting worktree path and ask how they want to proceed rather than guessing.
+
+Complete when the PR's source branch is checked out locally, in this same folder, with a clean worktree.
 
 ---
 
