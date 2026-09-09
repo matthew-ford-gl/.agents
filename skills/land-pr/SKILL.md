@@ -179,8 +179,8 @@ Complete when the PR's source branch is checked out locally, in this same folder
 1. Discover the remote default branch (remote's symbolic `HEAD` — do not assume `main`/`master`) and fetch it without pruning or touching unrelated refs.
 2. Merge `<remote>/<default>` into the current branch using the repository's documented merge policy. Do not rebase, squash, or use a blanket `ours`/`theirs` strategy.
 3. If Git reports conflicts, invoke the `resolving-merge-conflicts` skill with the target branch, fetched source ref, and this skill's existing authorization to complete the merge commit. Return here only after it reports zero unresolved paths or a blocker.
-4. If already up to date, continue without an empty commit. Otherwise complete the merge commit with normal hooks and message conventions.
-5. Run the repository's required validation (from `AGENTS.md`/CI) on the integrated result; fix only failures caused by the integration.
+4. If already up to date, continue without an empty commit and **skip step 5** — the current tree has already been validated. Otherwise complete the merge commit with normal hooks and message conventions.
+5. Only when a new merge or rebase commit was produced in step 4, run the repository's required validation (from `AGENTS.md`/CI) on the integrated result; fix only failures caused by the integration.
 6. Push the current branch normally (no force). Stop on a non-fast-forward rejection and ask the user how to reconcile it.
 
 If repository policy (`AGENTS.md`/`CONTRIBUTING`/`CLAUDE.md`) mandates rebase or linear history instead of a merge commit, rebase onto the default branch instead. A rebase rewrites commits already pushed on this PR branch, so **stop and ask the user before force-pushing** the rebased branch — this is the one force-push this skill may ever need, and it needs explicit per-use confirmation regardless of how this skill was invoked.
@@ -203,10 +203,11 @@ Complete when all four are captured for the current state of the PR (not a cache
 Before a `pr-fixer` or `code-reviewer` dispatch in Phases 5-6, create or refresh the applicable
 context under `<context_dir>/`:
 
-1. `diff.patch` — the current full diff.
+1. `diff.patch` — the current full diff. Record the current `HEAD` hash and reuse this file if `HEAD` has not changed since the last pass.
 2. `threads/<thread-id>.md` — one file per actionable thread, containing its full comment history.
 3. `ci-logs/<check-name>.log` — one file per failing check, containing its pulled logs.
 4. `standards/` — one file per standard or playbook loaded in Phase 0.
+5. Before each `pr-fixer` or `code-reviewer` dispatch, generate `diff-<batch>.patch` scoped to the files that batch touches. Pass that scoped diff and the applicable source files; do not pass the full `diff.patch` to the agents.
 
 Use filesystem-safe thread IDs and check names. If the repository-local fallback is selected,
 ensure `.tmp/` is ignored by Git, checking effective rules before adding a non-duplicate entry.
@@ -240,12 +241,13 @@ code-change request, a question/discussion, a nit, or a point you disagree with.
 
 **Fix-review loop** (actionable threads):
 
-1. Dispatch `pr-fixer` with paths to `diff.patch`, every actionable thread file in the
-   batch, applicable source files, and applicable staged standards. It returns working-tree
+1. Dispatch `pr-fixer` with paths to `diff-<batch>.patch`, every actionable thread file in
+   the batch, applicable source files, and applicable staged standards. It returns working-tree
    changes plus a drafted reply per thread — it does not commit, push, reply, or resolve.
 2. Run the project's build/lint/test commands (from `AGENTS.md` or standard tooling) against
    the working tree.
-3. Dispatch `code-reviewer` against the resulting diff.
+3. Dispatch `code-reviewer` against the updated `diff-<batch>.patch` (now including
+   `pr-fixer`'s working-tree changes for the batch's files).
 4. If `code-reviewer` returns BLOCKED or lists Must-fix items: re-dispatch `pr-fixer` with
    its feedback as the priority item, and repeat from step 2. Track attempts for this batch;
    after 3 failed loop attempts, stop, leave the working tree as-is, and record every thread
@@ -256,7 +258,7 @@ code-change request, a question/discussion, a nit, or a point you disagree with.
 
 Commit-attribution convention: if the repository's or user's global instructions specify one, use it exactly. Otherwise use a generic `Generated with [tool name]` line with a matching `Co-Authored-By:` for your own host/runtime — never hardcode another runtime's convention.
 
-Push commits normally (no force) to the PR branch once the batch is committed.
+Push commits normally (no force) to the PR branch once the batch is committed. Record that a push happened in this pass (`pushed_this_pass = true`).
 
 Complete when every thread is either resolved-with-a-reply or explicitly recorded as a human-decision blocker, and any resulting commits are pushed.
 
@@ -293,13 +295,14 @@ For every required check/policy that is not green:
   - **Flake**: re-run/requeue it directly; no fix authoring.
   - **Production bug / test bug / fixable infra or config issue**: batch it with every other
     fixable failing check from this pass and run the same fix-review loop as Phase 5 —
-    dispatch `pr-fixer` with paths to the staged logs and classification for the batch, run
-    the local gate, refresh `diff.patch`, dispatch `code-reviewer` with the applicable paths,
-    and loop on BLOCKED. Track attempts per distinct check; after 3
+    dispatch `pr-fixer` with paths to the staged logs, `diff-<batch>.patch` for the files
+    touched by the check, and the classification for the batch, run the local gate, refresh
+    `diff-<batch>.patch`, dispatch `code-reviewer` against the updated scoped diff, and loop on
+    BLOCKED. Track attempts per distinct check; after 3
     failed loop attempts on the same check, stop trying it and record it as a blocker with
     what was tried and why it didn't resolve.
-  - Once the gate and `code-reviewer` both pass: commit (attribution convention above), push,
-    and re-run the affected remote check(s) to confirm.
+  - Once the gate and `code-reviewer` both pass: commit (attribution convention above), push
+    (`pushed_this_pass = true`), and re-run the affected remote check(s) to confirm.
 
 Complete when every required check is green, or every non-green check is explicitly classified as in-progress or a blocker with reasoning.
 
@@ -307,7 +310,7 @@ Complete when every required check is green, or every non-green check is explici
 
 ## Phase 7: Verify full approval
 
-Re-fetch current reviewer state (a push in Phase 5/6 may have reset prior votes — check the platform's actual reset-on-push behaviour rather than assuming).
+Re-fetch the current reviewer state only if `pushed_this_pass` is true (a push in Phase 5/6 may have reset prior votes — check the platform's actual reset-on-push behaviour rather than assuming). If no commit was pushed this pass, reuse the reviewer state from Phase 4.
 
 - **GitHub**: every required reviewer's review state must be `APPROVED`.
 - **Azure DevOps**: every required reviewer's vote must be exactly `10` (Approved). A vote of `5` ("Approved with suggestions") does **not** satisfy this — treat it the same as no approval and keep the PR open for that reviewer. Identify the required reviewer(s)/group from the PR's branch policy or the user's stated required reviewer, rather than assuming a name.

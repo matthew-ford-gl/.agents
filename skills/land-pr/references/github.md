@@ -7,7 +7,9 @@ the CLI fallback and are what to reach for directly in Claude Code.
 
 ## Resolving a bare PR number (Phase 1)
 
-`gh pr view <number> --json url,headRefName,baseRefName` to get the full identifiers.
+`gh pr view <number> --json url,headRefName,baseRefName,title,body,reviews,statusCheckRollup,mergeable,files`
+to get the full identifiers, metadata, review states, and check rollup in one call. Reuse this
+single output across Phases 1-4 instead of calling `gh pr view` repeatedly.
 
 ## Phase 2/3: Checkout and sync
 
@@ -16,17 +18,18 @@ the CLI fallback and are what to reach for directly in Claude Code.
 
 ## Phase 4: Fetch full review state
 
-- `gh pr view <number> --json title,body,url,reviews,statusCheckRollup,mergeable,files` for
-  metadata, review states, and check rollup.
+- Reuse the `gh pr view` output from Phase 1 for metadata, review states, and check rollup.
+  Do not fetch it a second time.
 - `gh pr diff <number>` for the full diff.
-- Review threads with resolved status are **not** exposed by REST; use GraphQL:
+- Review threads with resolved status are **not** exposed by REST; use GraphQL, then keep only
+  unresolved threads unless the checkpoint shows a previously resolved thread may have new comments:
   ```
   gh api graphql -f query='
     query($owner:String!,$repo:String!,$num:Int!){
       repository(owner:$owner,name:$repo){
         pullRequest(number:$num){
           reviewThreads(first:100){
-            nodes{ id isResolved comments(first:50){ nodes{ id body author{login} } } }
+            nodes{ id isResolved comments(first:10){ nodes{ id body author{login} } pageInfo{ hasNextPage endCursor } } }
           }
         }
       }
