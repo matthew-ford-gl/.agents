@@ -86,7 +86,7 @@ not to the session. Derive a filesystem-safe PR identifier from the PR number or
 
 Resolve `context_root` using the same precedence the **Context workspace** section defines:
 
-1. `DEVIN_CONTEXT_ROOT` environment variable, when set.
+1. `CONTEXT_STORAGE_PATH` environment variable, when set.
 2. `root` in the repository's `.devin/agent-context.json`.
 3. `root` in `~/.config/devin/agent-context.json`.
 4. The host OS temporary directory when it is writable and readable by subagents.

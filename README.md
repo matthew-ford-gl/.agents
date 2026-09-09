@@ -155,7 +155,7 @@ Agents and skills that write temporary files (reviewer context, checkpoints, han
 
 | Priority | Source | Example |
 |----------|--------|---------|
-| 1 | `DEVIN_CONTEXT_ROOT` env var | `D:\agent-context` |
+| 1 | `CONTEXT_STORAGE_PATH` env var | `D:\agent-context` |
 | 2 | `root` in repo `.devin/agent-context.json` | `{ "root": "/data/agent-context" }` |
 | 3 | `root` in `~/.config/devin/agent-context.json` | `{ "root": "D:\\DEVIN_PLANS\\agent-context" }` |
 | 4 | OS temp directory (when writable by subagents) | `$TMPDIR`, `%TEMP%` |

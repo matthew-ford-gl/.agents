@@ -89,7 +89,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
 
 Resolve one absolute `context_root` in this order:
 
-1. `DEVIN_CONTEXT_ROOT`, when set.
+1. `CONTEXT_STORAGE_PATH`, when set.
 2. `root` in the repository's `.devin/agent-context.json`.
 3. `root` in `~/.config/devin/agent-context.json`.
 4. The host OS temporary directory when it is writable and readable by subagents.
