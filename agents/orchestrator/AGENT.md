@@ -8,7 +8,7 @@ model: opus
 
 ## Agents
 
-Plan-stage reviewers — permanent (always run, 5):
+Plan-stage reviewers — standard workflow (5):
 - senior-engineer
 - qa-gatekeeper
 - security-analyst
@@ -23,7 +23,7 @@ Plan-stage reviewers — conditional (auto-detected from scope):
 - dependency-reviewer    → when the plan introduces, upgrades, or removes packages or libraries
 - migration-reviewer     → when the plan modifies database schema or changes how persistent data is written
 
-Diff-stage reviewers — permanent (always run against the actual diff after tests pass):
+Diff-stage reviewers — standard workflow (run against the actual diff after tests pass):
 - qa-gatekeeper (implementation-review mode)
 - code-reviewer
 - guardian
@@ -45,11 +45,12 @@ strategic decision has already been debated and accepted by the human. In this c
 
 - **Skip step 3** — do not produce a new plan or stop for human approval
 - Use the provided implementation plan as the mandate
+- Complete steps 1 and 1b from that plan's scope before technical review
 - Note to the human: "Implementing accepted plan — beginning technical review"
-- Begin at **step 4** (fan out plan-stage reviewers)
+- Begin at **step 4** after classification; skip plan-stage reviewers there only when SIMPLE
 - Any DECISION.md rollout plan and rollback conditions carry forward into step 9 (PR description)
 
-All other steps (4 onwards) run as normal.
+All other steps run according to the resulting complexity classification.
 
 ## Path resolution
 For each agent, resolve its file by checking, in order, and using the first that exists:
@@ -129,7 +130,9 @@ session, and readable by the coordinator and subagents.
    - Plan touches multiple services, modules, or introduces service-to-service dependencies?
      → RUN_ARCHITECT
    - Plan modifies files that already exist (not purely net-new)?
-     Run: `git log --oneline -5 -- {affected files}` — if any results → RUN_HISTORIAN
+     Run: `git log --oneline -5 -- {affected files}`. Set RUN_HISTORIAN only when recent
+     history is significant to the proposed change, such as repeated fixes, reversions, or
+     prior design constraints; ordinary file history alone does not set the flag.
    - Plan affects user-facing behaviour, API endpoints consumed by a UI, or user data?
      → RUN_USER_ADVOCATE
    - Plan touches UI files (.tsx, .jsx, .vue, .svelte, .html, .css, templates)?
@@ -138,6 +141,30 @@ session, and readable by the coordinator and subagents.
      → RUN_DEPENDENCY
    - Plan includes migrations, schema changes, or repository layer writes?
      → RUN_MIGRATION
+
+1b. Classify task complexity from the scope and detection flags established in step 1.
+
+    Classify the task as **SIMPLE** only when every condition below is met:
+
+    - The change touches no more than 3 files.
+    - None of RUN_ARCHITECT, RUN_HISTORIAN, RUN_USER_ADVOCATE, RUN_ACCESSIBILITY,
+      RUN_DEPENDENCY, or RUN_MIGRATION is set.
+    - The change introduces no dependencies and includes no schema or migration changes.
+    - No affected path is security-sensitive, including authentication, permissions,
+      cryptography, payments, secrets, or environment configuration containing credentials.
+    - The task is documentation-only, a non-security configuration change, a version bump,
+      a typo/copy fix, styling/formatting-only, or test-only with no production-code changes.
+
+    Classify everything else as **STANDARD**. State the classification and one-line reasoning
+    before proceeding. For SIMPLE tasks, state: "Complexity: SIMPLE — skipping plan-stage
+    reviewers and reducing diff-stage review to code-reviewer + security-analyst."
+
+    If steps 3-6 reveal additional files, detection flags, dependencies, interactions, or
+    security-sensitive scope that violate any SIMPLE condition, reclassify the task as STANDARD
+    and run the complete plan-stage reviewer set in step 4 before continuing implementation.
+
+    Complete when the task has a stated SIMPLE or STANDARD classification supported by the
+    observed scope and all SIMPLE conditions have been evaluated.
 
 2. Load domain-specific project context. After identifying affected paths:
 
@@ -165,7 +192,12 @@ session, and readable by the coordinator and subagents.
    `<context_dir>/plan.md` after approval.
    STOP and wait for human approval before continuing.
 
-4. Fan out plan-stage reviewers in parallel, using the Spawning mechanism above.
+4. Run plan-stage review according to the complexity classification.
+
+   **SIMPLE:** skip all plan-stage reviewer dispatches. The human-approved plan from step 3 is
+   the implementation mandate. Continue to step 5 without creating reviewer response entries.
+
+   **STANDARD:** fan out plan-stage reviewers in parallel using the Spawning mechanism above.
 
    Pass every reviewer the paths to `<context_dir>/plan.md`, each applicable
    file under `standards/`, and the list of staged paths under `source/`. Tell the reviewer
@@ -173,7 +205,7 @@ session, and readable by the coordinator and subagents.
    relevant to its checklist domain. A dispatch prompt contains only the review
    instructions, paths to read, and detection flags; never inline file contents.
 
-   **Permanent reviewers** (always — 5 tasks):
+   **Permanent STANDARD reviewers** (5 tasks):
 
    senior-engineer, qa-gatekeeper, security-analyst: no special instruction beyond plan
    and standards content.
@@ -257,18 +289,26 @@ session, and readable by the coordinator and subagents.
     If no CI file or repository instruction names validation commands, ask the human.
 
 7b. Generate the full diff against the base branch and write it to
-    `<context_dir>/diff.patch`. Collect the repository-relative paths of all
-    test files touched or created. Run `qa-gatekeeper` in implementation-review mode,
-    passing the paths to `plan.md`, `diff.patch`, the applicable staged standards, and the
-    touched test files. Tell it to read those files at the start; do not inline their contents.
-    If it returns BLOCKED, address the gaps and loop back to step 7a, refreshing `diff.patch`
-    before the next review.
+    `<context_dir>/diff.patch`. Collect the repository-relative paths of all test files touched
+    or created.
+
+    **SIMPLE:** continue to step 8; `qa-gatekeeper` is not part of the reduced reviewer set.
+
+    **STANDARD:** run `qa-gatekeeper` in implementation-review mode, passing the paths to
+    `plan.md`, `diff.patch`, the applicable staged standards, and the touched test files. Tell
+    it to read those files at the start; do not inline their contents. If it returns BLOCKED,
+    address the gaps and loop back to step 7a, refreshing `diff.patch` before the next review.
 
 8. Run diff-stage reviewers in parallel, using the Spawning mechanism above. Pass paths to
    `plan.md`, `diff.patch`, applicable staged standards, and the staged source-file list.
    Tell each reviewer to read the plan and diff at the start and only the source and standards
    relevant to its checklist domain. Dispatch prompts contain instructions, paths, and flags,
    never inline file contents.
+
+   **SIMPLE:** dispatch only `code-reviewer` and `security-analyst`.
+
+   **STANDARD:** dispatch every permanent reviewer below plus `accessibility-reviewer` when
+   RUN_ACCESSIBILITY is set.
 
    code-reviewer: no special instruction needed.
 
@@ -347,11 +387,13 @@ session, and readable by the coordinator and subagents.
     you finish, your session is not resumable — anything you don't state explicitly is lost.
 
     The final report must include, regardless of invocation mode:
+    - **Complexity classification**: SIMPLE or STANDARD, with one-line reasoning. For SIMPLE,
+      name the plan-stage and diff-stage reviewers skipped because of the reduced workflow.
     - **Plan-stage reviewers**: every reviewer that ran (permanent + any conditional ones
-      triggered), each with its verdict (APPROVED/BLOCKED) and one line of rationale.
-      Explicitly name `security-analyst`'s verdict — never omit it even if it was
-      unremarkable.
-    - **Diff-stage reviewers**: same format, for the diff-stage pass in step 8.
+      triggered), each with its verdict (APPROVED/BLOCKED) and one line of rationale. For SIMPLE,
+      state explicitly that plan-stage review was skipped by the complexity gate.
+    - **Diff-stage reviewers**: same format, for the diff-stage pass in step 8. Explicitly name
+      `security-analyst`'s verdict — never omit it even if it was unremarkable.
     - Any reviewer that could not run (e.g. unrecognized profile) — name it and say so;
       do not silently absorb its persona into your own reasoning as a substitute.
     - CI/test gate status (from step 7a).
