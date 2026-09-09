@@ -17,9 +17,11 @@ collaborators may have already based work on without confirmation, or merging/co
 PR — that last step always belongs to the user.
 
 Repeat Phases 4-8 each time you're invoked (this skill is idempotent: it re-reads current state
-rather than assuming anything from a previous pass). For long unattended monitoring beyond a
-single pass, tell the user to wrap this skill with `/loop`, e.g. `/loop 10m /land-pr <PR>`,
-rather than sleeping inside one invocation for hours.
+rather than assuming anything from a previous pass, but uses the checkpoint file from Phase 0b
+to skip already-resolved items and avoid retrying the same failed approaches). A maximum of 4
+passes are allowed per PR before escalating to a human via a handoff document. For long
+unattended monitoring beyond a single pass, tell the user to wrap this skill with `/loop`,
+e.g. `/loop 10m /land-pr <PR>`, rather than sleeping inside one invocation for hours.
 
 ## Role split
 
@@ -72,6 +74,45 @@ retrying the push.
 3. If `.context/index.md` exists, load any entries matching the PR's domain.
 
 Complete when applicable instruction files are loaded.
+
+---
+
+## Phase 0b: Pass tracking
+
+Check for an existing checkpoint file at `.tmp/land-pr-checkpoint.json` in the repository
+root.
+
+If found, read it and extract:
+- `pass_number`: increment by 1 for this pass.
+- `pr`: verify it matches the current PR argument (discard the checkpoint if different PR).
+- `resolved_threads`: thread IDs already resolved in previous passes — do not re-process
+  these in Phase 5 unless they have new unresolved comments.
+- `green_checks`: check names that were green at end of previous pass — still re-verify
+  in Phase 4 but don't investigate them in Phase 6 unless they're now failing.
+- `failed_fixes`: record of fixes attempted that didn't resolve their target — try a
+  different approach or escalate.
+- `context_files_loaded`: which project context files were loaded (skip re-reading
+  if checkpoint exists and files haven't changed).
+
+If not found, or if reading fails (corrupted/malformed), this is pass 1. Create the
+checkpoint structure in memory.
+
+**Max-pass cap**: if `pass_number` > 4, do NOT proceed with another fix attempt.
+Instead:
+1. Write a final handoff document to `.tmp/land-pr-handoff.md` containing:
+   - PR URL and current state summary
+   - Threads still unresolved (with comment history summary)
+   - CI checks still failing (with last error summary)
+   - What was tried on each failing item across all passes
+   - Suggested next steps for a human
+2. Report the handoff path to the user:
+   "Max attempts (4 passes) reached. Handoff written to `.tmp/land-pr-handoff.md`.
+   Review the outstanding items and either fix manually or reset the checkpoint
+   with `Remove-Item .tmp/land-pr-checkpoint.json` to allow further automated attempts."
+3. Stop.
+
+Complete when `pass_number` is set and is <= 4, or the handoff has been written and the
+skill has stopped.
 
 ---
 
@@ -155,6 +196,16 @@ applicable paths to each agent rather than making every agent load every file.
 
 ## Phase 5: Resolve every open comment thread
 
+Before classifying threads, consult the checkpoint (from Phase 0b) if one exists:
+
+- **`resolved_threads`**: check each against the current thread state. If a previously-resolved
+  thread is still resolved, skip it entirely. If a previously-resolved thread has new unresolved
+  comments, process only the new comments.
+- **`failed_fixes`** for a thread: do NOT retry the same approach — the dispatch to `pr-fixer`
+  must include the previous attempt(s) and their outcomes so it tries something categorically
+  different. After 2 different approaches on the same thread across passes, classify it as a
+  human-decision blocker.
+
 For each thread that is not already resolved, **classify** it: a concrete actionable
 code-change request, a question/discussion, a nit, or a point you disagree with.
 
@@ -188,9 +239,24 @@ Push commits normally (no force) to the PR branch once the batch is committed.
 
 Complete when every thread is either resolved-with-a-reply or explicitly recorded as a human-decision blocker, and any resulting commits are pushed.
 
+**Context shedding**: before proceeding to Phase 6, discard the full thread comment histories
+from your active context. Retain only: the list of thread IDs with their resolution status
+(resolved/blocked/new-comments), and for any threads dispatched to `pr-fixer`, retain only
+the commit hash of the fix. The full comment text is in `<context_dir>/threads/` if needed
+by a future dispatch.
+
 ---
 
 ## Phase 6: Investigate and fix CI
+
+Before investigating checks, consult the checkpoint (from Phase 0b) if one exists:
+
+- **`green_checks`**: still verify their current status from Phase 4 output, but don't
+  investigate them unless they've regressed to failing.
+- **`failed_fixes`** for a check: include the previous attempt details in the `pr-fixer`
+  dispatch so it tries a categorically different approach. After 2 different approaches on
+  the same check across passes, classify it as a human-decision blocker (not just "after 3
+  failed loop attempts within one pass").
 
 For every required check/policy that is not green:
 
@@ -240,6 +306,33 @@ Determine the overall state:
 - **BLOCKED — waiting on others**: everything actionable is done; you're waiting on CI to finish or a reviewer to look again. Report the specific wait and tell the user to either re-invoke this skill later or wrap it with `/loop <interval> /land-pr <PR>` for periodic unattended re-checks.
 - **BLOCKED — human decision needed**: one or more disagreement/ambiguous threads, or a CI failure that exceeded the retry cap. List each with your reasoning so the user can decide.
 
+Before reporting the verdict, write the checkpoint file to `.tmp/land-pr-checkpoint.json`:
+
+```json
+{
+  "pr": "<PR URL or number>",
+  "pass_number": <current pass number>,
+  "timestamp": "<ISO 8601>",
+  "resolved_threads": ["<thread IDs resolved so far>"],
+  "green_checks": ["<check names currently green>"],
+  "failed_fixes": [
+    {
+      "target": "<thread ID or check name>",
+      "pass": <pass number>,
+      "approach": "<one-line description of what was tried>",
+      "result": "<why it didn't work>"
+    }
+  ],
+  "outstanding_threads": ["<thread IDs still unresolved>"],
+  "outstanding_checks": ["<check names still failing>"],
+  "context_files_loaded": ["<paths of project context files loaded in Phase 0>"]
+}
+```
+
+This file serves double duty:
+- Cross-session state for `/loop` re-invocations (context window starts fresh).
+- Pass counter for the max-pass cap.
+
 Complete when one of these four states is reported with concrete evidence for each open item.
 
 ---
@@ -253,6 +346,7 @@ LAND PR — {PR title}
 {PR URL}
 
 Verdict: {READY TO MERGE / BLOCKED}
+Pass:        {current pass number}/4
 
 Branch:      {up to date / N commits behind default, now merged/rebased}
 Threads:     {resolved}/{total} resolved
@@ -265,7 +359,14 @@ Outstanding:
 Next step: {merge yourself when ready / re-run this skill / wrap with /loop / decide on the listed items}
 ```
 
-After reporting the verdict, delete only the resolved `context_dir` if it exists; never
-remove `session_context` or `context_root`. Use the absolute path with
+After reporting the verdict:
+
+- If the verdict is **READY TO MERGE**: delete `.tmp/land-pr-checkpoint.json` and
+  `.tmp/land-pr-context/` (if it exists) in addition to `context_dir`. These are no longer
+  needed once the PR is merge-ready.
+- If the verdict is **BLOCKED**: do NOT delete the checkpoint — it is needed for the next pass.
+
+Delete only the resolved `context_dir` if it exists; never remove `session_context` or
+`context_root`. Use the absolute path with
 `Remove-Item -LiteralPath $context_dir -Recurse -Force` in PowerShell or
 `rm -rf -- "$context_dir"` in bash, and do not fail if it is already absent.
