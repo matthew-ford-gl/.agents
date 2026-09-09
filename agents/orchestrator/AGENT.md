@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: Main execution workflow. Takes a brief, produces a plan, fans out specialist reviewers, implements, tests, and raises a PR. Supports pre-approved mode when invoked by /plan-task or /analyse-bug with a debate-tested plan.
-model: opus
+model: sonnet
 ---
 
 # Orchestrator Workflow
