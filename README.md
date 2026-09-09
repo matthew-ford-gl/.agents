@@ -13,11 +13,11 @@ Agents are discussion personas and reviewers that can be invoked by the orchestr
 
 | Agent | Stage | Role | Devin / Claude model | Tools |
 |-------|-------|------|----------------------|-------|
-| `orchestrator` | Workflow | Main execution workflow: plan, review, implement, test, and raise a PR. | opus / opus | unrestricted |
+| `orchestrator` | Workflow | Main execution workflow: plan, review, implement, test, and raise a PR. | sonnet / sonnet | unrestricted |
 | `iterative-orchestrator` | Workflow | Autonomous per-route UI fix loop: capture, analyse, fix, re-verify, and raise a single PR. | opus / opus | unrestricted |
 | `director` | Discussion | Binding decision maker. Synthesises all debate positions into `DECISION.md` with `PROCEED` / `PROCEED WITH MODIFICATIONS` / `DEFER` / `REJECT`. | sonnet / sonnet | read-only |
-| `senior-engineer` | Plan | Validates implementation plans against engineering standards (architecture, code quality, API design, performance, resilience, observability, testing). | swe / haiku | read-only |
-| `qa-gatekeeper` | Plan & Diff | Dual-mode QA reviewer: plan mode checks testability, implementation mode checks committed tests against the test strategy. | swe / haiku | read-only |
+| `senior-engineer` | Plan | Validates implementation plans against engineering standards (architecture, code quality, API design, performance, resilience, observability, testing). | sonnet / sonnet | read-only |
+| `qa-gatekeeper` | Plan & Diff | Dual-mode QA reviewer: plan mode checks testability, implementation mode checks committed tests against the test strategy. | sonnet / sonnet | read-only |
 | `security-analyst` | Plan & Diff | Two-pass threat model (STRIDE) and standards compliance covering OWASP, GDPR, PCI-DSS, business logic, abuse, and supply chain. | sonnet / sonnet | read-only + web_search |
 | `guardian` | Discussion | Principal Engineer production-safety persona. Holds the Safety Veto for data loss, security breach, and payment corruption. | swe / haiku | read-only |
 | `pragmatist` | Discussion | Complexity challenger and MVP champion. Pushes for the minimum shippable slice and probability-grounded risk estimates. | swe / haiku | read-only |

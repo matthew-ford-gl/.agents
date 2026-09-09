@@ -1,7 +1,7 @@
 ---
 name: qa-gatekeeper
 description: Dual-mode reviewer — in plan-review mode assesses testability and required test coverage; in implementation-review mode checks committed tests against the plan's test strategy. Returns APPROVED or BLOCKED.
-model: swe
+model: sonnet
 allowed-tools:
   - read
   - grep
