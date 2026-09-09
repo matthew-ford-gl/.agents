@@ -84,6 +84,35 @@ Detect which runtime you are in and use its native mechanism for parallel review
   exists, say explicitly that a reviewer is being run inline rather than presenting inline
   reasoning as if it were an independent review.
 
+## Context workspace
+
+Resolve one absolute `context_root` in this order:
+
+1. `DEVIN_CONTEXT_ROOT`, when set.
+2. `root` in the repository's `.devin/agent-context.json`.
+3. `root` in `~/.config/devin/agent-context.json`.
+4. The host OS temporary directory when it is writable and readable by subagents.
+5. `<repository-root>/.tmp` as the portability fallback.
+
+The optional configuration file shape is `{ "root": "D:\\DEVIN_PLANS\\agent-context" }`.
+Resolve `~`, environment variables, and relative configured values to an absolute path; resolve
+relative values from the configuration file's directory. Verify the selected root with a small
+write/read/delete probe before dispatching reviewers. If a configured root fails, report it and
+continue down the precedence list rather than silently using an inaccessible path.
+
+Derive a filesystem-safe repository name from the Git top-level directory name. Use the
+runtime's session ID when exposed; otherwise generate one UUID once and retain it for the whole
+workflow. Convert the session ID to a deterministic filesystem-safe representation. Set
+`session_context = <context_root>/<repo-name>/<session-id>` and
+`context_dir = <session_context>/orchestrator`. Canonicalize these paths and verify each is a
+strict descendant of the preceding path before creating or deleting anything. Pass absolute
+paths below `context_dir` to every subagent. When this orchestrator runs `land-pr` in step 10,
+pass the same `session_context` so it uses `<session_context>/land-pr` rather than resolving a
+second session.
+
+Complete when `context_root`, `session_context`, and `context_dir` are absolute, unique to this
+session, and readable by the coordinator and subagents.
+
 ## Steps
 
 0. Load the project-level ground rules before doing anything else:
@@ -117,8 +146,8 @@ Detect which runtime you are in and use its native mechanism for parallel review
    - If `.context/index.md` exists, scan it for keywords matching the task domain. Load
      every matched standard, playbook, and convention file into your context now.
 
-2b. Stage verbose context for subagent consumption under `.tmp/orchestrator-context/` in
-    the repository root. Keep each category separate so reviewers can load only what applies:
+2b. Stage verbose context for subagent consumption under `<context_dir>/`. Keep each
+    category separate so reviewers can load only what applies:
 
     - `plan.md` — write the approved plan after step 3; in pre-approved mode, write the
       provided plan before step 4.
@@ -129,16 +158,16 @@ Detect which runtime you are in and use its native mechanism for parallel review
     - `reviewer-verdicts.md` — write the plan-stage verdict summary after step 5.
     - `plan-review-responses/` — write one file per full plan-stage reviewer response.
 
-    Ensure `.tmp/` is ignored by Git. Check the effective ignore rules first and add `.tmp/`
-    to `.gitignore` only when it is not already ignored; never duplicate an existing rule.
+    If the repository-local fallback is selected, ensure `.tmp/` is ignored by Git. Check
+    effective ignore rules first and add `.tmp/` only when needed; never duplicate a rule.
 
 3. Produce a plan: files to change, why, risks, test strategy. Write the approved plan to
-   `.tmp/orchestrator-context/plan.md` after approval.
+   `<context_dir>/plan.md` after approval.
    STOP and wait for human approval before continuing.
 
 4. Fan out plan-stage reviewers in parallel, using the Spawning mechanism above.
 
-   Pass every reviewer the paths to `.tmp/orchestrator-context/plan.md`, each applicable
+   Pass every reviewer the paths to `<context_dir>/plan.md`, each applicable
    file under `standards/`, and the list of staged paths under `source/`. Tell the reviewer
    to read the plan and applicable standards at the start, then read only source files
    relevant to its checklist domain. A dispatch prompt contains only the review
@@ -182,7 +211,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
    migration-reviewer [RUN_MIGRATION]: identify the staged migration, schema, and repository paths.
 
 5. Consolidate feedback. Write each full response under
-   `.tmp/orchestrator-context/plan-review-responses/` and write one line per reviewer to
+   `<context_dir>/plan-review-responses/` and write one line per reviewer to
    `reviewer-verdicts.md`: agent name, APPROVED/BLOCKED, and a one-line reason. If any agent
    returns BLOCKED, present the reason and STOP for human input. Incorporate all non-blocking
    feedback into the implementation approach.
@@ -228,7 +257,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
     If no CI file or repository instruction names validation commands, ask the human.
 
 7b. Generate the full diff against the base branch and write it to
-    `.tmp/orchestrator-context/diff.patch`. Collect the repository-relative paths of all
+    `<context_dir>/diff.patch`. Collect the repository-relative paths of all
     test files touched or created. Run `qa-gatekeeper` in implementation-review mode,
     passing the paths to `plan.md`, `diff.patch`, the applicable staged standards, and the
     touched test files. Tell it to read those files at the start; do not inline their contents.
@@ -335,7 +364,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
     verdicts are load-bearing information the caller needs to verify the change was actually
     checked, not just built and tested.
 
-12. Cleanup. After capturing everything required for step 11, delete
-    `.tmp/orchestrator-context/` if it exists. Use
-    `Remove-Item -Recurse -Force .tmp/orchestrator-context` in PowerShell or
-    `rm -rf .tmp/orchestrator-context` in bash, and do not fail if it is already absent.
+12. Cleanup. After capturing everything required for step 11, delete only the resolved
+    `context_dir` if it exists; never delete `session_context` or `context_root`. Use the
+    resolved absolute path with `Remove-Item -LiteralPath $context_dir -Recurse -Force` in
+    PowerShell or `rm -rf -- "$context_dir"` in bash, and do not fail if it is already absent.

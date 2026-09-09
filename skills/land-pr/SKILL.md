@@ -30,9 +30,10 @@ its output through `code-reviewer` and your local validation gate before anythin
 or pushed. This keeps exactly one writer touching the branch at a time and keeps a bad fix from
 ever reaching a live thread reply or a pushed commit.
 
-**Path resolution** — for `pr-fixer`, `code-reviewer`, and the `test-failure-triager` skill,
-resolve in order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` →
-`~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md` (agents); for the skill,
+**Path resolution** — for `orchestrator`, `pr-fixer`, `code-reviewer`, and the
+`test-failure-triager` skill, resolve in order: `.devin/agents/<name>/AGENT.md` →
+`.claude/agents/<name>.md` → `~/.agents/agents/<name>/AGENT.md` →
+`~/.claude/agents/<name>.md` (agents); for the skill,
 `.devin/skills/test-failure-triager/SKILL.md` → `.claude/skills/test-failure-triager/SKILL.md` →
 `~/.agents/skills/test-failure-triager/SKILL.md` → `~/.claude/skills/test-failure-triager/SKILL.md`.
 
@@ -40,9 +41,16 @@ resolve in order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md`
 documents for its reviewers (Claude Code: `Task`/`Agent` with `subagent_type` set to the
 agent's `name`; Devin CLI: `run_subagent` with `profile: "<name>"`, falling back to
 `subagent_general` with the resolved `AGENT.md` content as the prompt if the profile is
-unrecognized). Pass paths under `.tmp/land-pr-context/`, not inline content. Tell each agent
-to read the applicable files at the start and include only its instructions and paths in the
-dispatch prompt.
+unrecognized). Pass paths under `context_dir`, not inline content. Tell each agent to read
+the applicable files at the start and include only its instructions and paths in the dispatch
+prompt.
+
+**Context workspace** — read and apply `orchestrator`'s **Context workspace** section as the
+single source of truth for root configuration, access probing, repository naming, session-ID
+fallback, and path safety. If a caller provides `session_context`, reuse it; otherwise resolve
+one for this invocation. Set `context_dir = <session_context>/land-pr` and pass absolute paths
+to subagents. Complete when `session_context` and `context_dir` are absolute, session-scoped,
+and readable by the coordinator and subagents.
 
 **`test-failure-triager` is invoked as a skill, not a subagent** — it has no `model:` field,
 so it runs inline in your own context rather than as a separate dispatch. Use it, don't
@@ -131,17 +139,17 @@ Read `references/github.md` or `references/azure-devops.md` (matching `platform`
 Complete when all four are captured for the current state of the PR (not a cached view from an earlier pass).
 
 Before a `pr-fixer` or `code-reviewer` dispatch in Phases 5-6, create or refresh the applicable
-context under `.tmp/land-pr-context/`:
+context under `<context_dir>/`:
 
 1. `diff.patch` — the current full diff.
 2. `threads/<thread-id>.md` — one file per actionable thread, containing its full comment history.
 3. `ci-logs/<check-name>.log` — one file per failing check, containing its pulled logs.
 4. `standards/` — one file per standard or playbook loaded in Phase 0.
 
-Use filesystem-safe thread IDs and check names. Ensure `.tmp/` is ignored by Git, checking
-effective ignore rules before adding a non-duplicate `.tmp/` entry. Refresh changed evidence
-before every dispatch so agents never review stale state. Pass only applicable paths to each
-agent rather than making every agent load every file.
+Use filesystem-safe thread IDs and check names. If the repository-local fallback is selected,
+ensure `.tmp/` is ignored by Git, checking effective rules before adding a non-duplicate entry.
+Refresh changed evidence before every dispatch so agents never review stale state. Pass only
+applicable paths to each agent rather than making every agent load every file.
 
 ---
 
@@ -257,6 +265,7 @@ Outstanding:
 Next step: {merge yourself when ready / re-run this skill / wrap with /loop / decide on the listed items}
 ```
 
-After reporting the verdict, delete `.tmp/land-pr-context/` if it exists. Use
-`Remove-Item -Recurse -Force .tmp/land-pr-context` in PowerShell or
-`rm -rf .tmp/land-pr-context` in bash, and do not fail if it is already absent.
+After reporting the verdict, delete only the resolved `context_dir` if it exists; never
+remove `session_context` or `context_root`. Use the absolute path with
+`Remove-Item -LiteralPath $context_dir -Recurse -Force` in PowerShell or
+`rm -rf -- "$context_dir"` in bash, and do not fail if it is already absent.
