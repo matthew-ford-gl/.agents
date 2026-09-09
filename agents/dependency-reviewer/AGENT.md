@@ -1,7 +1,7 @@
 ---
 name: dependency-reviewer
 description: Conditional plan-stage reviewer for changes that introduce, upgrade, or remove packages — checks supply chain credibility, maintenance status, license compatibility, necessity, transitive dependencies, and known CVEs. Returns APPROVED or BLOCKED.
-model: swe
+model: sonnet
 allowed-tools:
   - read
   - grep
