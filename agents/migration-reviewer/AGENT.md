@@ -1,7 +1,7 @@
 ---
 name: migration-reviewer
 description: Conditional plan-stage reviewer for database schema changes and data migrations — checks zero-downtime compatibility, deployment ordering, rollback safety, data integrity, and whether the migration is safe at production row counts. Returns APPROVED or BLOCKED.
-model: sonnet
+model: swe
 allowed-tools:
   - read
   - grep

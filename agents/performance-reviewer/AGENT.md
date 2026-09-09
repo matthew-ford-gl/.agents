@@ -1,7 +1,7 @@
 ---
 name: performance-reviewer
 description: Diff-stage reviewer — checks introduced code for N+1 queries, algorithmic complexity, missing indexes, unbounded fetches, caching gaps, memory leaks, and scale ceiling. Returns APPROVED or BLOCKED.
-model: swe
+model: sonnet
 allowed-tools:
   - read
   - grep
