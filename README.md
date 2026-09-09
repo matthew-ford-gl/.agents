@@ -149,6 +149,48 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 
 ---
 
+## Context Storage Conventions
+
+Agents and skills that write temporary files (reviewer context, checkpoints, handoff documents) must store them under a resolved `context_root` rather than hardcoding paths. The canonical definition lives in `agents/orchestrator/AGENT.md` § *Context workspace*; every consumer must follow the same precedence chain:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | `DEVIN_CONTEXT_ROOT` env var | `D:\agent-context` |
+| 2 | `root` in repo `.devin/agent-context.json` | `{ "root": "/data/agent-context" }` |
+| 3 | `root` in `~/.config/devin/agent-context.json` | `{ "root": "D:\\DEVIN_PLANS\\agent-context" }` |
+| 4 | OS temp directory (when writable by subagents) | `$TMPDIR`, `%TEMP%` |
+| 5 | `<repository-root>/.tmp` (portability fallback) | `~/project/.tmp` |
+
+Resolve `~`, environment variables, and relative values to absolute paths. Verify the selected root with a write/read/delete probe before use. If a configured root fails, continue down the list rather than silently using an inaccessible path.
+
+### Path scoping
+
+Context paths are scoped to avoid collisions between concurrent sessions and between different PRs:
+
+| Scope | Pattern | Used by |
+|-------|---------|---------|
+| Session | `<context_root>/<repo>/<session-id>/<skill-or-agent>/` | `orchestrator` (reviewer context, staged files, diffs) |
+| PR | `<context_root>/<repo>/land-pr-checkpoint-<pr-id>.json` | `land-pr` (checkpoint survives across `/loop` re-invocations) |
+| PR | `<context_root>/<repo>/land-pr-handoff-<pr-id>.md` | `land-pr` (max-pass escalation handoff) |
+
+**Session-scoped** paths use a runtime session ID (or a one-time UUID) and are cleaned up by the owning agent when the workflow completes. **PR-scoped** paths use a filesystem-safe PR identifier and persist across sessions until the PR is merged or the user deletes them.
+
+### `.tmp/` and `.gitignore`
+
+When the repository-local fallback (option 5) is selected, the skill must ensure `.tmp/` is Git-ignored. Check effective ignore rules before adding an entry — never duplicate a rule that already covers the path.
+
+### Adding new persistent storage to a skill
+
+When a new skill needs cross-session files:
+
+1. Resolve `context_root` using the precedence above (or reuse it if already resolved by a caller like `orchestrator`).
+2. Choose the right scope — session-scoped for throwaway context, PR/task-scoped for state that must survive re-invocation.
+3. Derive a collision-free path under `<context_root>/<repo>/`.
+4. Document the path pattern in the skill's own `SKILL.md`.
+5. Clean up on success; preserve on failure or escalation.
+
+---
+
 ## Repository Layout
 
 ```
