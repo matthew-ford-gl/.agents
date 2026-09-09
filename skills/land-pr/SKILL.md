@@ -79,8 +79,29 @@ Complete when applicable instruction files are loaded.
 
 ## Phase 0b: Pass tracking
 
-Check for an existing checkpoint file at `.tmp/land-pr-checkpoint.json` in the repository
-root.
+Resolve a **checkpoint path** for this PR. The checkpoint must survive across `/loop`
+re-invocations (which create new session IDs), so it is scoped to the repository and PR,
+not to the session. Derive a filesystem-safe PR identifier from the PR number or URL
+(e.g. `pr-42`).
+
+Resolve `context_root` using the same precedence the **Context workspace** section defines:
+
+1. `DEVIN_CONTEXT_ROOT` environment variable, when set.
+2. `root` in the repository's `.devin/agent-context.json`.
+3. `root` in `~/.config/devin/agent-context.json`.
+4. The host OS temporary directory when it is writable and readable by subagents.
+5. `<repository-root>/.tmp` as the portability fallback.
+
+If `context_root` was already resolved earlier in this invocation (by the Context workspace
+setup), reuse it. Set:
+
+- `checkpoint_path = <context_root>/<repo-name>/land-pr-checkpoint-<pr-id>.json`
+- `handoff_path = <context_root>/<repo-name>/land-pr-handoff-<pr-id>.md`
+
+If the repository-local fallback (option 5) is selected, ensure `.tmp/` is ignored by Git,
+checking effective rules before adding a non-duplicate entry.
+
+Check for an existing checkpoint file at `checkpoint_path`.
 
 If found, read it and extract:
 - `pass_number`: increment by 1 for this pass.
@@ -99,20 +120,20 @@ checkpoint structure in memory.
 
 **Max-pass cap**: if `pass_number` > 4, do NOT proceed with another fix attempt.
 Instead:
-1. Write a final handoff document to `.tmp/land-pr-handoff.md` containing:
+1. Write a final handoff document to `handoff_path` containing:
    - PR URL and current state summary
    - Threads still unresolved (with comment history summary)
    - CI checks still failing (with last error summary)
    - What was tried on each failing item across all passes
    - Suggested next steps for a human
 2. Report the handoff path to the user:
-   "Max attempts (4 passes) reached. Handoff written to `.tmp/land-pr-handoff.md`.
+   "Max attempts (4 passes) reached. Handoff written to `<handoff_path>`.
    Review the outstanding items and either fix manually or reset the checkpoint
-   with `Remove-Item .tmp/land-pr-checkpoint.json` to allow further automated attempts."
+   by deleting `<checkpoint_path>` to allow further automated attempts."
 3. Stop.
 
-Complete when `pass_number` is set and is <= 4, or the handoff has been written and the
-skill has stopped.
+Complete when `checkpoint_path`, `handoff_path`, and `pass_number` are set and
+`pass_number` <= 4, or the handoff has been written and the skill has stopped.
 
 ---
 
@@ -306,7 +327,8 @@ Determine the overall state:
 - **BLOCKED — waiting on others**: everything actionable is done; you're waiting on CI to finish or a reviewer to look again. Report the specific wait and tell the user to either re-invoke this skill later or wrap it with `/loop <interval> /land-pr <PR>` for periodic unattended re-checks.
 - **BLOCKED — human decision needed**: one or more disagreement/ambiguous threads, or a CI failure that exceeded the retry cap. List each with your reasoning so the user can decide.
 
-Before reporting the verdict, write the checkpoint file to `.tmp/land-pr-checkpoint.json`:
+Before reporting the verdict, write the checkpoint file to `checkpoint_path` (resolved in
+Phase 0b):
 
 ```json
 {
@@ -361,9 +383,8 @@ Next step: {merge yourself when ready / re-run this skill / wrap with /loop / de
 
 After reporting the verdict:
 
-- If the verdict is **READY TO MERGE**: delete `.tmp/land-pr-checkpoint.json` and
-  `.tmp/land-pr-context/` (if it exists) in addition to `context_dir`. These are no longer
-  needed once the PR is merge-ready.
+- If the verdict is **READY TO MERGE**: delete `checkpoint_path` and `handoff_path` (if they
+  exist) in addition to `context_dir`. These are no longer needed once the PR is merge-ready.
 - If the verdict is **BLOCKED**: do NOT delete the checkpoint — it is needed for the next pass.
 
 Delete only the resolved `context_dir` if it exists; never remove `session_context` or

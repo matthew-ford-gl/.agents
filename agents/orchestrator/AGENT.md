@@ -381,8 +381,8 @@ session, and readable by the coordinator and subagents.
       significant (multiple rounds of thread resolution or CI fix attempts have accumulated
       data in this session), stop step 10 and suggest the human continue with:
       `/loop 10m /land-pr <PR URL>`.
-      This starts fresh sessions with clean context windows. The checkpoint file
-      (`.tmp/land-pr-checkpoint.json`) preserves state across invocations.
+      This starts fresh sessions with clean context windows. The land-pr checkpoint
+      file (stored under `context_root`) preserves state across invocations.
 
 11. **Final report to the caller — always include reviewer verdicts.**
 
