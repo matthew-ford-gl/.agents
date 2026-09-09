@@ -117,18 +117,32 @@ Detect which runtime you are in and use its native mechanism for parallel review
    - If `.context/index.md` exists, scan it for keywords matching the task domain. Load
      every matched standard, playbook, and convention file into your context now.
 
-   Pass all loaded context to all sub-agents in steps 3 and 7.
+2b. Stage verbose context for subagent consumption under `.tmp/orchestrator-context/` in
+    the repository root. Keep each category separate so reviewers can load only what applies:
 
-3. Produce a plan: files to change, why, risks, test strategy.
+    - `plan.md` — write the approved plan after step 3; in pre-approved mode, write the
+      provided plan before step 4.
+    - `standards/` — one file per standard, playbook, or convention loaded in step 2.
+    - `source/` — one file per affected source file, preserving repository-relative paths
+      (for example, `source/src/auth/login.ts`).
+    - `diff.patch` — write the full diff after step 7a.
+    - `reviewer-verdicts.md` — write the plan-stage verdict summary after step 5.
+    - `plan-review-responses/` — write one file per full plan-stage reviewer response.
+
+    Ensure `.tmp/` is ignored by Git. Check the effective ignore rules first and add `.tmp/`
+    to `.gitignore` only when it is not already ignored; never duplicate an existing rule.
+
+3. Produce a plan: files to change, why, risks, test strategy. Write the approved plan to
+   `.tmp/orchestrator-context/plan.md` after approval.
    STOP and wait for human approval before continuing.
 
 4. Fan out plan-stage reviewers in parallel, using the Spawning mechanism above.
 
-   Always pass to every reviewer:
-   - The approved plan
-   - Relevant file contents (not paths)
-   - Any standards/playbooks loaded in step 2
-   Do not pass file paths — pass actual content.
+   Pass every reviewer the paths to `.tmp/orchestrator-context/plan.md`, each applicable
+   file under `standards/`, and the list of staged paths under `source/`. Tell the reviewer
+   to read the plan and applicable standards at the start, then read only source files
+   relevant to its checklist domain. A dispatch prompt contains only the review
+   instructions, paths to read, and detection flags; never inline file contents.
 
    **Permanent reviewers** (always — 5 tasks):
 
@@ -161,14 +175,21 @@ Detect which runtime you are in and use its native mechanism for parallel review
    Flag where errors leave users stuck. Conclude with APPROVED or BLOCKED. BLOCKED if a
    common error has no user-recoverable path."
 
-   accessibility-reviewer [RUN_ACCESSIBILITY]: pass plan and all UI file contents.
+   accessibility-reviewer [RUN_ACCESSIBILITY]: identify the staged UI source paths.
 
-   dependency-reviewer [RUN_DEPENDENCY]: pass plan and relevant manifest files with contents.
+   dependency-reviewer [RUN_DEPENDENCY]: identify the staged manifest paths.
 
-   migration-reviewer [RUN_MIGRATION]: pass plan and all migration/schema/repository files.
+   migration-reviewer [RUN_MIGRATION]: identify the staged migration, schema, and repository paths.
 
-5. Consolidate feedback. If any agent returns BLOCKED, present the reason and STOP for
-   human input. Incorporate all non-blocking feedback into the implementation approach.
+5. Consolidate feedback. Write each full response under
+   `.tmp/orchestrator-context/plan-review-responses/` and write one line per reviewer to
+   `reviewer-verdicts.md`: agent name, APPROVED/BLOCKED, and a one-line reason. If any agent
+   returns BLOCKED, present the reason and STOP for human input. Incorporate all non-blocking
+   feedback into the implementation approach.
+
+5b. Shed plan-review context before step 6. Retain only the approved plan with incorporated
+    feedback, the one-line verdict list, full reasons for BLOCKED items, and the detection
+    flags from step 1. Use the staged response files if full reviewer text is needed later.
 
 6. Before editing, verify the current branch complies with `AGENTS.md`. Never implement
    directly on a protected or integration branch. Create the required task branch from the
@@ -206,16 +227,19 @@ Detect which runtime you are in and use its native mechanism for parallel review
 
     If no CI file or repository instruction names validation commands, ask the human.
 
-7b. Generate the diff (`git diff` against the base branch). Collect all test files touched
-    or created. Run `qa-gatekeeper` as a Task in implementation-review mode, passing:
-    - The approved plan
-    - The diff
-    - All test file contents (not paths)
-    - Any standards/playbooks loaded in step 2
-    If it returns BLOCKED, address the gaps and loop back to step 7a.
+7b. Generate the full diff against the base branch and write it to
+    `.tmp/orchestrator-context/diff.patch`. Collect the repository-relative paths of all
+    test files touched or created. Run `qa-gatekeeper` in implementation-review mode,
+    passing the paths to `plan.md`, `diff.patch`, the applicable staged standards, and the
+    touched test files. Tell it to read those files at the start; do not inline their contents.
+    If it returns BLOCKED, address the gaps and loop back to step 7a, refreshing `diff.patch`
+    before the next review.
 
-8. Run diff-stage reviewers in parallel, using the Spawning mechanism above, passing the
-   approved plan, the diff, and any standards/playbooks loaded in step 2.
+8. Run diff-stage reviewers in parallel, using the Spawning mechanism above. Pass paths to
+   `plan.md`, `diff.patch`, applicable staged standards, and the staged source-file list.
+   Tell each reviewer to read the plan and diff at the start and only the source and standards
+   relevant to its checklist domain. Dispatch prompts contain instructions, paths, and flags,
+   never inline file contents.
 
    code-reviewer: no special instruction needed.
 
@@ -310,3 +334,8 @@ Detect which runtime you are in and use its native mechanism for parallel review
     Do not summarize this down to just "shipped files + gate status + caveats" — reviewer
     verdicts are load-bearing information the caller needs to verify the change was actually
     checked, not just built and tested.
+
+12. Cleanup. After capturing everything required for step 11, delete
+    `.tmp/orchestrator-context/` if it exists. Use
+    `Remove-Item -Recurse -Force .tmp/orchestrator-context` in PowerShell or
+    `rm -rf .tmp/orchestrator-context` in bash, and do not fail if it is already absent.

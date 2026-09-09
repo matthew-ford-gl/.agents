@@ -40,8 +40,9 @@ resolve in order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md`
 documents for its reviewers (Claude Code: `Task`/`Agent` with `subagent_type` set to the
 agent's `name`; Devin CLI: `run_subagent` with `profile: "<name>"`, falling back to
 `subagent_general` with the resolved `AGENT.md` content as the prompt if the profile is
-unrecognized). Always pass file *content*, not paths: the diff, the thread/check evidence,
-and any standards/playbooks loaded in Phase 0.
+unrecognized). Pass paths under `.tmp/land-pr-context/`, not inline content. Tell each agent
+to read the applicable files at the start and include only its instructions and paths in the
+dispatch prompt.
 
 **`test-failure-triager` is invoked as a skill, not a subagent** — it has no `model:` field,
 so it runs inline in your own context rather than as a separate dispatch. Use it, don't
@@ -129,6 +130,19 @@ Read `references/github.md` or `references/azure-devops.md` (matching `platform`
 
 Complete when all four are captured for the current state of the PR (not a cached view from an earlier pass).
 
+Before a `pr-fixer` or `code-reviewer` dispatch in Phases 5-6, create or refresh the applicable
+context under `.tmp/land-pr-context/`:
+
+1. `diff.patch` — the current full diff.
+2. `threads/<thread-id>.md` — one file per actionable thread, containing its full comment history.
+3. `ci-logs/<check-name>.log` — one file per failing check, containing its pulled logs.
+4. `standards/` — one file per standard or playbook loaded in Phase 0.
+
+Use filesystem-safe thread IDs and check names. Ensure `.tmp/` is ignored by Git, checking
+effective ignore rules before adding a non-duplicate `.tmp/` entry. Refresh changed evidence
+before every dispatch so agents never review stale state. Pass only applicable paths to each
+agent rather than making every agent load every file.
+
 ---
 
 ## Phase 5: Resolve every open comment thread
@@ -146,10 +160,9 @@ code-change request, a question/discussion, a nit, or a point you disagree with.
 
 **Fix-review loop** (actionable threads):
 
-1. Dispatch `pr-fixer` with the full comment history and files for every actionable thread
-   in the batch, the current diff, and any standards/playbooks loaded in Phase 0. It returns
-   working-tree changes plus a drafted reply per thread — it does not commit, push, reply, or
-   resolve.
+1. Dispatch `pr-fixer` with paths to `diff.patch`, every actionable thread file in the
+   batch, applicable source files, and applicable staged standards. It returns working-tree
+   changes plus a drafted reply per thread — it does not commit, push, reply, or resolve.
 2. Run the project's build/lint/test commands (from `AGENTS.md` or standard tooling) against
    the working tree.
 3. Dispatch `code-reviewer` against the resulting diff.
@@ -185,8 +198,9 @@ For every required check/policy that is not green:
   - **Flake**: re-run/requeue it directly; no fix authoring.
   - **Production bug / test bug / fixable infra or config issue**: batch it with every other
     fixable failing check from this pass and run the same fix-review loop as Phase 5 —
-    dispatch `pr-fixer` with the logs and classification for the batch, run the local gate,
-    dispatch `code-reviewer`, loop on BLOCKED. Track attempts per distinct check; after 3
+    dispatch `pr-fixer` with paths to the staged logs and classification for the batch, run
+    the local gate, refresh `diff.patch`, dispatch `code-reviewer` with the applicable paths,
+    and loop on BLOCKED. Track attempts per distinct check; after 3
     failed loop attempts on the same check, stop trying it and record it as a blocker with
     what was tried and why it didn't resolve.
   - Once the gate and `code-reviewer` both pass: commit (attribution convention above), push,
@@ -242,3 +256,7 @@ Outstanding:
 
 Next step: {merge yourself when ready / re-run this skill / wrap with /loop / decide on the listed items}
 ```
+
+After reporting the verdict, delete `.tmp/land-pr-context/` if it exists. Use
+`Remove-Item -Recurse -Force .tmp/land-pr-context` in PowerShell or
+`rm -rf .tmp/land-pr-context` in bash, and do not fail if it is already absent.
