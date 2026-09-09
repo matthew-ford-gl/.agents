@@ -89,7 +89,7 @@ Detect which runtime you are in and use its native mechanism for parallel review
 
 Resolve one absolute `context_root` in this order:
 
-1. `DEVIN_CONTEXT_ROOT`, when set.
+1. `CONTEXT_STORAGE_PATH`, when set.
 2. `root` in the repository's `.devin/agent-context.json`.
 3. `root` in `~/.config/devin/agent-context.json`.
 4. The host OS temporary directory when it is writable and readable by subagents.
@@ -377,6 +377,12 @@ session, and readable by the coordinator and subagents.
       decision needed**. Never merge or complete the PR yourself. If CI is still pending after
       one pass, report it as in-progress and suggest the human wrap continued checking with
       `/loop <interval> /land-pr <PR>` rather than polling indefinitely in this run.
+    - If the land-pr verdict is not READY TO MERGE after one pass and context usage is
+      significant (multiple rounds of thread resolution or CI fix attempts have accumulated
+      data in this session), stop step 10 and suggest the human continue with:
+      `/loop 10m /land-pr <PR URL>`.
+      This starts fresh sessions with clean context windows. The land-pr checkpoint
+      file (stored under `context_root`) preserves state across invocations.
 
 11. **Final report to the caller — always include reviewer verdicts.**
 
