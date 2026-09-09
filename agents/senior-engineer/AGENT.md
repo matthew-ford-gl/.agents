@@ -1,7 +1,7 @@
 ---
 name: senior-engineer
 description: Plan-stage reviewer — validates implementation plans against engineering standards covering architecture, code quality, API design, performance, resilience, observability, and testing. Returns APPROVED or BLOCKED with standards-referenced violations.
-model: swe
+model: sonnet
 allowed-tools:
   - read
   - grep
