@@ -2,15 +2,15 @@
 
 Read this file when Phase 1 (in `SKILL.md`) determines `platform = ado`.
 
-Prefer MCP server `azure-devops` when available; `az` / `az rest` commands below are the CLI
-fallback and are what to reach for directly in Claude Code. All REST calls need
-`api-version=7.1` (or the org's supported version) and org/project/repo scoped to the PR.
+Use `scripts/snapshot.py ado` as the authoritative read path. It executes the supported Azure CLI
+commands with API version 7.1 and emits only decision fields. Do not list MCP tools, inspect CLI help,
+change Azure defaults, try alternate URL encodings, or substitute broad `az rest` responses.
 
 ## Resolving a bare PR number (Phase 1)
 
-`az repos pr show --id <number> -o json` returns `repository.project.name`, `repository.name`,
-`sourceRefName`, `targetRefName`, and the org can be read from the configured `az devops`
-defaults or `git remote get-url origin`.
+`az repos pr show --id <number> -o json` is the single metadata source. It returns repository and
+project IDs, source/target refs, commits, merge status, and reviewers. The snapshot script uses those
+IDs for every subsequent command.
 
 ## Phase 2/3: Checkout and sync
 
@@ -25,25 +25,17 @@ enum. The PR reports actual merge conflicts when `mergeStatus` is `"conflicts"`.
 
 ## Phase 4: Fetch full review state
 
-- `az repos pr show --id <id> -o json` for metadata, `reviewers` (each with `vote` and
-  `isRequired`), and `sourceRefName`/`targetRefName`.
-- Diff: only when an actionable thread or completed failing check requires code inspection,
-  use `git diff <targetRefName>...<sourceRefName>` locally after fetching both refs;
-  `az repos pr diff` is not a standard command.
-- Comment threads (not exposed by `az repos pr show`):
-  ```
-  az rest --method get \
-    --url "https://dev.azure.com/{org}/{project}/_apis/git/repositories/{repo}/pullRequests/{id}/threads?api-version=7.1"
-  ```
-  Each thread has `id`, `status` (`active`, `fixed`, `wontFix`, `closed`, `pending`, `unknown`),
-  and a `comments` array. Treat `active`/`pending` as unresolved.
-- Build validation / required policies:
-  ```
-  az rest --method get \
-    --url "https://dev.azure.com/{org}/{project}/_apis/git/repositories/{repo}/pullRequests/{id}/policyEvaluations?api-version=7.1"
-  ```
-  Each evaluation has `status` (`approved`, `running`, `queued`, `rejected`, `broken`,
-  `notApplicable`) and, for build policies, a `context` payload containing the `buildId`.
+The snapshot already contains metadata, active/pending text threads, policy classifications,
+reviewers, latest iteration, and changed paths. Reuse it. If the script failed after metadata,
+use these exact fallbacks once with IDs from that metadata:
+
+- Threads: `az devops invoke --area git --resource pullRequestThreads --route-parameters project=<project-id> repositoryId=<repo-id> pullRequestId=<id> --api-version 7.1 -o json`
+- Policies: `az repos pr policy list --id <id> -o json`
+- Iterations: `az devops invoke --area git --resource pullRequestIterations --route-parameters project=<project-id> repositoryId=<repo-id> pullRequestId=<id> --api-version 7.1 -o json`
+- Latest changes: use `pullRequestIterationChanges` with the same route plus `iterationId=<latest>`.
+
+Project only active/pending text threads and policy decision fields before returning output to the
+model. Generate a local diff only after an actionable item proves it necessary.
 
 ## Phase 5: Replying to and resolving threads
 

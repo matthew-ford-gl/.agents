@@ -2,14 +2,13 @@
 
 Read this file when Phase 1 (in `SKILL.md`) determines `platform = github`.
 
-Prefer MCP server `devin/github-mcp-server` when available; `gh`/`gh api` commands below are
-the CLI fallback and are what to reach for directly in Claude Code.
+Use `scripts/snapshot.py github` as the authoritative read path. It runs one projected `gh pr view`
+and emits only decision fields. Do not list MCP tools, inspect CLI help, or fetch an unprojected PR.
 
 ## Resolving a bare PR number (Phase 1)
 
-`gh pr view <number> --json url,headRefName,baseRefName,title,body,reviews,statusCheckRollup,mergeable,mergeStateStatus,files`
-to get the full identifiers, metadata, review states, and check rollup in one call. Reuse this
-single output across Phases 1-4 instead of calling `gh pr view` repeatedly.
+The snapshot script requests identifiers, refs, commits, metadata, review states, check rollup, merge
+state, and changed paths in one call. Reuse its output across Phases 1-4.
 
 ## Phase 2/3: Checkout and sync
 

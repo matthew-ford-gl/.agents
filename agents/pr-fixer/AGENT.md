@@ -52,7 +52,9 @@ remediation brief or supplied standards make them required.
 - Fix the root cause shown in the evidence you were given, not a guess. If the evidence is
   insufficient to safely fix an item, say so in your report instead of guessing.
 - Stay within the scope of the batch. Do not fix unrelated pre-existing issues you notice
-  in passing — report them instead.
+  in passing — report them instead. Before finishing, compare every touched path with the
+  implicated paths. Give a one-line necessity justification for each additional path; revert
+  your own unjustified changes before returning.
 - Match existing code style and conventions in the files you touch.
 - Before adding a new helper, abstraction, or test utility, grep the codebase for an
   existing one covering the same need (e.g. a metrics/telemetry recorder, a test fixture,
@@ -69,4 +71,5 @@ For each item in the batch, report:
 - **Fixed** (with a one-line description of the change) / **Not fixed** (with why, and
   what evidence would be needed)
 - For thread fixes: the drafted reply text
+- **Touched paths** — every changed path, marking implicated paths and justifying each additional path
 - Any pre-existing issues noticed but left untouched, flagged for the caller
