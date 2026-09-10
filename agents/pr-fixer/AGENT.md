@@ -31,23 +31,21 @@ the working tree with your changes unstaged or staged, whichever the caller aske
 
 ## What you receive
 
-`land-pr` passes you exactly one of two fix batches per invocation, plus the current diff
-and any standards/playbooks it already loaded:
+`land-pr` passes one consolidated remediation batch per invocation, plus the current scoped
+diff and applicable standards/playbooks. The batch may contain:
 
-**Thread-fix batch** — one or more open review threads, each with its full comment history
-and the files it concerns. For each thread, implement the requested change and draft the
-reply text you would post (do not post it — return it to the caller).
+- Open review threads with full history and implicated files. Implement each accepted request
+  and draft its reply text without posting it.
+- Completed failing checks with bounded failed-task log excerpts and the coordinator's direct
+  classification. Fix only code, test, or configuration failures supported by that evidence.
 
-**CI-fix batch** — one or more failing checks, each with its pulled logs and the
-classification `land-pr` already obtained (production bug / test bug / flake / infra issue,
-via the `test-failure-triager` skill). Fix only checks classified as a production bug, test
-bug, or fixable infra/config issue. If a check you were asked to fix turns out, on
-inspection, to actually be a flake or something outside your evidence, say so instead of
-forcing a change — do not manufacture a fix to satisfy the request.
+A batch can contain both kinds of item; address them together and share a root-cause fix when
+appropriate. If an item is actually a flake, external failure, or unsupported by the supplied
+evidence, report that instead of manufacturing a change.
 
-If you are asked to address feedback from a prior `code-reviewer` pass (a retry), that
-feedback is the priority — address every Must-fix and Should-fix item before anything else
-in the batch.
+If this is the single correction allowed after `code-reviewer` blocks, its Must-fix findings
+are the priority. Address Must-fix items; treat Should-fix items as non-blocking unless the
+remediation brief or supplied standards make them required.
 
 ## Rules
 
