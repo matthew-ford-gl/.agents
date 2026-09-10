@@ -39,13 +39,22 @@ ever reaching a live thread reply or a pushed commit.
 `.devin/skills/test-failure-triager/SKILL.md` → `.claude/skills/test-failure-triager/SKILL.md` →
 `~/.agents/skills/test-failure-triager/SKILL.md` → `~/.claude/skills/test-failure-triager/SKILL.md`.
 
-**Spawning `pr-fixer` / `code-reviewer`** — same runtime-native mechanism `orchestrator`
-documents for its reviewers (Claude Code: `Task`/`Agent` with `subagent_type` set to the
-agent's `name`; Devin CLI: `run_subagent` with `profile: "<name>"`, falling back to
-`subagent_general` with the resolved `AGENT.md` content as the prompt if the profile is
-unrecognized). Pass paths under `context_dir`, not inline content. Tell each agent to read
-the applicable files at the start and include only its instructions and paths in the dispatch
-prompt.
+**Spawning `pr-fixer` / `code-reviewer`** — use the runtime-native mechanism `orchestrator`
+documents, but require both agents to operate against this invocation's existing checkout.
+Never request or create a clone, worktree, sandbox copy, or dependency copy for either dispatch.
+Use a shared-checkout/read-only mode when the runtime exposes one. `pr-fixer` is the only writer
+and runs alone; `code-reviewer` starts only after `pr-fixer` returns and is read-only. If the
+runtime can dispatch an agent only by allocating another repository checkout, run that agent
+inline from its resolved `AGENT.md` instead and disclose that the review was not isolated. Pass
+paths under `context_dir`, not inline content. Tell each agent to read only the applicable files
+and include only its instructions and paths in the dispatch prompt.
+
+**Resource budget** — reuse this checkout, its dependency installation, and build caches for the
+whole pass. Do not run package restore/install merely to refresh an existing usable checkout.
+Run at most one local validation command set per fix-review attempt: `pr-fixer` authors the fix
+without validating, then the coordinator runs the applicable gate once before `code-reviewer`.
+Remote CI remains the final full-gate confirmation. Complete when no nested checkout was created
+and validation was not duplicated for the same working-tree state.
 
 **Context workspace** — read and apply `orchestrator`'s **Context workspace** section as the
 single source of truth for root configuration, access probing, repository naming, session-ID
@@ -153,15 +162,18 @@ Complete when `platform` and every identifier needed for later phases are set.
 
 ## Phase 2: Sync the local branch safely
 
-This phase operates **in place**, in whichever folder this skill was invoked from — including
-a git worktree folder. Switch that folder's checked-out branch to the PR's source branch; never
-`git clone` a fresh copy of the repo and never create a new worktree (e.g. `git worktree add`,
-`EnterWorktree`) to work in instead. A worktree folder is reused across PRs by changing which
-branch it has checked out, not by spinning up another folder per PR.
+Treat the folder where this skill was invoked as the already-isolated checkout for the entire
+workflow. Operate **in place** and switch this checkout to the PR's source branch. Do not clone the
+repository, create or enter another worktree, allocate a sandbox checkout, or relocate execution
+to a different path. This applies even when the current checkout is on another branch.
 
 Record the repository root, current branch, and worktree status. Require a clean index and worktree — no uncommitted changes, no untracked paths that a checkout could overwrite. If dirty, stop and ask the user to commit or stash first; never stash or discard automatically.
 
-Check out the PR's source branch locally (`gh pr checkout <number>`, or for ADO fetch the source branch named in `az repos pr show` and check it out). Stop if the checkout would overwrite local work.
+Resolve the PR's source branch from platform metadata, fetch only the needed remote ref, then use
+`git switch <local-source-branch>` when it already exists or
+`git switch --track -c <local-source-branch> <remote>/<source-branch>` when it does not. Run these
+commands from the invocation checkout. Do not use a platform checkout command or runtime feature
+that may allocate another worktree or clone. Stop if switching would overwrite local work.
 
 If git refuses the checkout because the branch is already checked out in another worktree
 (`fatal: '<branch>' is already checked out at '<path>'`), that other worktree is a separate
@@ -204,19 +216,19 @@ Read `references/github.md` or `references/azure-devops.md` (matching `platform`
 
 Complete when all four are captured for the current state of the PR (not a cached view from an earlier pass).
 
-Before a `pr-fixer` or `code-reviewer` dispatch in Phases 5-6, create or refresh the applicable
-context under `<context_dir>/`:
+Stage evidence lazily only when a `pr-fixer` or `code-reviewer` dispatch is required. Under
+`<context_dir>/current-batch/`, write only:
 
-1. `diff.patch` — the current full diff. Record the current `HEAD` hash and reuse this file if `HEAD` has not changed since the last pass.
-2. `threads/<thread-id>.md` — one file per actionable thread, containing its full comment history.
-3. `ci-logs/<check-name>.log` — one file per failing check, containing its pulled logs.
-4. `standards/` — one file per standard or playbook loaded in Phase 0.
-5. Before each `pr-fixer` or `code-reviewer` dispatch, generate `diff-<batch>.patch` scoped to the files that batch touches. Pass that scoped diff and the applicable source files; do not pass the full `diff.patch` to the agents.
+1. `diff.patch` — the current diff scoped to files in this batch. Regenerate it after edits rather than retaining both full and scoped copies.
+2. `threads/<thread-id>.md` — actionable threads in this batch, with full comment history.
+3. `ci-logs/<check-name>.log` — failing checks in this batch. Fetch failed-task output rather than whole-run logs when the platform supports it. If a log is too large for useful agent review, keep the failure-bearing sections plus bounded head/tail context and record that it was reduced.
+4. `standards/` — only standards or playbooks applicable to this batch.
 
-Use filesystem-safe thread IDs and check names. If the repository-local fallback is selected,
-ensure `.tmp/` is ignored by Git, checking effective rules before adding a non-duplicate entry.
-Refresh changed evidence before every dispatch so agents never review stale state. Pass only
-applicable paths to each agent rather than making every agent load every file.
+Pass source files from the existing checkout by absolute path; do not copy them into context.
+Use filesystem-safe names. Refresh changed evidence before every dispatch. If the
+repository-local fallback is selected, ensure `.tmp/` is ignored by Git, checking effective
+rules before adding a non-duplicate entry. Retain staged evidence for later passes and handoff
+diagnostics. Complete when each dispatch has current, minimal evidence.
 
 ---
 
@@ -245,13 +257,13 @@ code-change request, a question/discussion, a nit, or a point you disagree with.
 
 **Fix-review loop** (actionable threads):
 
-1. Dispatch `pr-fixer` with paths to `diff-<batch>.patch`, every actionable thread file in
-   the batch, applicable source files, and applicable staged standards. It returns working-tree
-   changes plus a drafted reply per thread — it does not commit, push, reply, or resolve.
-2. Run the project's build/lint/test commands (from `AGENTS.md` or standard tooling) against
-   the working tree.
-3. Dispatch `code-reviewer` against the updated `diff-<batch>.patch` (now including
-   `pr-fixer`'s working-tree changes for the batch's files).
+1. Dispatch `pr-fixer` with paths to `current-batch/diff.patch`, every actionable thread file
+   in the batch, applicable source files, and applicable staged standards. It returns
+   working-tree changes plus a drafted reply per thread — it does not validate, commit, push,
+   reply, or resolve.
+2. Run the project's applicable build/lint/test gate (from `AGENTS.md` or standard tooling)
+   once against the working tree.
+3. Regenerate `current-batch/diff.patch` and dispatch `code-reviewer` against it.
 4. If `code-reviewer` returns BLOCKED or lists Must-fix items: re-dispatch `pr-fixer` with
    its feedback as the priority item, and repeat from step 2. Track attempts for this batch;
    after 3 failed loop attempts, stop, leave the working tree as-is, and record every thread
@@ -299,9 +311,9 @@ For every required check/policy that is not green:
   - **Flake**: re-run/requeue it directly; no fix authoring.
   - **Production bug / test bug / fixable infra or config issue**: batch it with every other
     fixable failing check from this pass and run the same fix-review loop as Phase 5 —
-    dispatch `pr-fixer` with paths to the staged logs, `diff-<batch>.patch` for the files
-    touched by the check, and the classification for the batch, run the local gate, refresh
-    `diff-<batch>.patch`, dispatch `code-reviewer` against the updated scoped diff, and loop on
+    dispatch `pr-fixer` with paths to the staged logs, `current-batch/diff.patch` for the files
+    touched by the check, and the classification for the batch, run the local gate once, refresh
+    `current-batch/diff.patch`, dispatch `code-reviewer` against it, and loop on
     BLOCKED. Track attempts per distinct check; after 3
     failed loop attempts on the same check, stop trying it and record it as a blocker with
     what was tried and why it didn't resolve.
@@ -388,13 +400,7 @@ Outstanding:
 Next step: {merge yourself when ready / re-run this skill / wrap with /loop / decide on the listed items}
 ```
 
-After reporting the verdict:
-
-- If the verdict is **READY TO MERGE**: delete `checkpoint_path` and `handoff_path` (if they
-  exist) in addition to `context_dir`. These are no longer needed once the PR is merge-ready.
-- If the verdict is **BLOCKED**: do NOT delete the checkpoint — it is needed for the next pass.
-
-Delete only the resolved `context_dir` if it exists; never remove `session_context` or
-`context_root`. Use the absolute path with
-`Remove-Item -LiteralPath $context_dir -Recurse -Force` in PowerShell or
-`rm -rf -- "$context_dir"` in bash, and do not fail if it is already absent.
+After reporting, retain `context_dir` so later passes and human handoffs can reuse the captured
+evidence. Report its path to the user. Never remove it automatically. For **READY TO MERGE**,
+remove only the checkpoint and handoff files because the PR no longer needs cross-pass control
+state. For **BLOCKED**, retain them for the next pass.

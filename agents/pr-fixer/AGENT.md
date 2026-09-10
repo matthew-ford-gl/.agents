@@ -60,9 +60,9 @@ in the batch.
   existing one covering the same need (e.g. a metrics/telemetry recorder, a test fixture,
   a formatting helper) and reuse it instead of introducing a parallel implementation. Only
   add a new one if nothing existing covers the need.
-- Run the project's relevant local validation (build/lint/test for the files you changed)
-  before returning, and report the result. `land-pr` re-runs the full gate afterward
-  regardless.
+- Do not run package restore/install, build, lint, or tests. The `land-pr` coordinator runs
+  the applicable validation once after all changes in the batch are ready, avoiding duplicate
+  validation and build artifacts for the same working-tree state.
 
 ## Response
 
