@@ -1,6 +1,6 @@
 ---
 name: land-pr
-description: "Takes a PR number or URL (GitHub or Azure DevOps), brings the branch up to date with the default branch, resolves every open review thread with a code fix or reply, investigates and fixes failing CI checks, requeues expired or stale builds, and repeats until every thread is resolved, CI is green, and the required reviewer's vote is a full approval — not 'approved with suggestions'. Stops short of merging. Use when asked to get a PR ready to merge, babysit a PR, drive PR feedback and CI failures to zero, or land/finish a PR end-to-end. Not for: opening a brand-new PR (use ship), a one-off static compliance review with no fix loop (use review-pr), or merging/completing the PR itself (always left to the user)."
+description: "Takes a PR number or URL (GitHub or Azure DevOps), merges the latest default branch into the PR branch only when the PR reports actual merge conflicts, resolves every open review thread with a code fix or reply, investigates and fixes failing CI checks, requeues expired or stale builds, and repeats until every thread is resolved, CI is green, and the required reviewer's vote is a full approval — not 'approved with suggestions'. Stops short of merging. Use when asked to get a PR ready to merge, babysit a PR, drive PR feedback and CI failures to zero, or land/finish a PR end-to-end. Not for: opening a brand-new PR (use ship), a one-off static compliance review with no fix loop (use review-pr), or merging/completing the PR itself (always left to the user)."
 argument-hint: "<PR number or URL (GitHub or Azure DevOps)>"
 disable-model-invocation: true
 model: sonnet  # coordinator role only — classifies state and drives phase transitions; actual fix-authoring is dispatched to pr-fixer (sonnet, write-capable) and gated by code-reviewer
@@ -172,20 +172,24 @@ Complete when the PR's source branch is checked out locally, in this same folder
 
 ---
 
-## Phase 3: Bring the branch up to date with the default branch
+## Phase 3: Merge the default branch only when the PR reports actual conflicts
 
-`merge-default-branch` has `disable-model-invocation: true` and cannot be invoked via the Skill tool from here — this phase performs the same steps directly instead, staying within the authorization already granted by this skill's own user invocation (fetch, merge, push on the PR's own branch).
+This phase is a conditional sync. Do not bring the PR branch up to date with the default branch unless the platform itself reports an actual merge conflict. Merging or rebasing the default branch proactively (for example, simply because the branch is behind) is no longer part of this workflow.
 
-1. Discover the remote default branch (remote's symbolic `HEAD` — do not assume `main`/`master`) and fetch it without pruning or touching unrelated refs.
-2. Merge `<remote>/<default>` into the current branch using the repository's documented merge policy. Do not rebase, squash, or use a blanket `ours`/`theirs` strategy.
-3. If Git reports conflicts, invoke the `resolving-merge-conflicts` skill with the target branch, fetched source ref, and this skill's existing authorization to complete the merge commit. Return here only after it reports zero unresolved paths or a blocker.
-4. If already up to date, continue without an empty commit and **skip step 5** — the current tree has already been validated. Otherwise complete the merge commit with normal hooks and message conventions.
-5. Only when a new merge or rebase commit was produced in step 4, run the repository's required validation (from `AGENTS.md`/CI) on the integrated result; fix only failures caused by the integration.
-6. Push the current branch normally (no force). Stop on a non-fast-forward rejection and ask the user how to reconcile it.
+1. Query the current merge-conflict state from the platform. Use the metadata already fetched in Phase 1 if it is fresh; otherwise re-query the minimal fields.
+   - GitHub: see `references/github.md` for the `gh pr view --json mergeable,mergeStateStatus` command. The PR reports conflicts when `mergeStateStatus == "DIRTY"` or `mergeable == "CONFLICTING"`.
+   - Azure DevOps: see `references/azure-devops.md` for `az repos pr show`. The PR reports conflicts when `mergeStatus` is `"conflicts"`.
+2. If the PR does **not** report conflicts, record `default_branch_merged = false` and continue to Phase 4 without fetching or touching the default branch. Do not produce an empty merge or rebase commit and do not push.
+3. If the PR reports conflicts:
+   a. Discover the remote default branch (remote's symbolic `HEAD` — do not assume `main`/`master`) and fetch it without pruning or touching unrelated refs.
+   b. Merge `<remote>/<default>` into the current branch using the repository's documented merge policy. Do not rebase, squash, or use a blanket `ours`/`theirs` strategy.
+   c. If Git reports conflicts, invoke the `resolving-merge-conflicts` skill with the target branch, fetched source ref, and this skill's existing authorization to complete the merge commit. Return here only after it reports zero unresolved paths or a blocker.
+   d. If the merge completed with no changes (already up to date), continue without an empty commit and skip step 3e. Otherwise complete the merge commit with normal hooks and message conventions.
+   e. Only when a new merge or rebase commit was produced, run the repository's required validation (from `AGENTS.md`/CI) on the integrated result; fix only failures caused by the integration.
+   f. Push the current branch normally (no force). Stop on a non-fast-forward rejection and ask the user how to reconcile it.
+4. If repository policy (`AGENTS.md`/`CONTRIBUTING`/`CLAUDE.md`) mandates rebase or linear history instead of a merge commit, rebase onto the default branch instead. A rebase rewrites commits already pushed on this PR branch, so **stop and ask the user before force-pushing** the rebased branch — this is the one force-push this skill may ever need, and it needs explicit per-use confirmation regardless of how this skill was invoked.
 
-If repository policy (`AGENTS.md`/`CONTRIBUTING`/`CLAUDE.md`) mandates rebase or linear history instead of a merge commit, rebase onto the default branch instead. A rebase rewrites commits already pushed on this PR branch, so **stop and ask the user before force-pushing** the rebased branch — this is the one force-push this skill may ever need, and it needs explicit per-use confirmation regardless of how this skill was invoked.
-
-Complete when the branch contains the latest default-branch commits and the result (merge or rebase) is pushed.
+Complete when either (a) no conflicts were reported and the branch was left as-is, or (b) conflicts were reported and the merge or rebase has been resolved and pushed.
 
 ---
 
@@ -325,7 +329,7 @@ Complete when every required reviewer/policy shows a full approval, or the exact
 
 Determine the overall state:
 
-- **READY TO MERGE**: branch up to date, every thread resolved, every required check green, every required reviewer at full approval. Report this and stop — do not merge or complete the PR yourself; hand it to the user.
+- **READY TO MERGE**: no actual merge conflicts reported on the PR (or any reported conflicts were resolved by merging the default branch), every thread resolved, every required check green, every required reviewer at full approval. Report this and stop — do not merge or complete the PR yourself; hand it to the user.
 - **BLOCKED — action needed from you**: something in Phases 5-6 is still fixable by you (untried fix, unaddressed thread). Keep working through it in this same pass.
 - **BLOCKED — waiting on others**: everything actionable is done; you're waiting on CI to finish or a reviewer to look again. Report the specific wait and tell the user to either re-invoke this skill later or wrap it with `/loop <interval> /land-pr <PR>` for periodic unattended re-checks.
 - **BLOCKED — human decision needed**: one or more disagreement/ambiguous threads, or a CI failure that exceeded the retry cap. List each with your reasoning so the user can decide.
@@ -373,7 +377,7 @@ LAND PR — {PR title}
 Verdict: {READY TO MERGE / BLOCKED}
 Pass:        {current pass number}/4
 
-Branch:      {up to date / N commits behind default, now merged/rebased}
+Branch:      {up to date / no conflicts reported, left unchanged / conflicts reported, now merged/rebased}
 Threads:     {resolved}/{total} resolved
 CI:          {passing checks}/{required checks} green
 Approval:    {required reviewer(s)} — {state/vote}
