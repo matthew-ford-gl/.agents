@@ -16,7 +16,12 @@ defaults or `git remote get-url origin`.
 
 No single `az` command checks out a PR branch. Get `sourceRefName` from `az repos pr show`,
 then `git fetch origin <sourceRefName>:<local-branch>` and `git checkout <local-branch>`.
-Bringing the branch up to date is handled by `merge-default-branch` (Phase 3 of `SKILL.md`).
+Bringing the branch up to date is handled by `land-pr` Phase 3 of `SKILL.md`.
+
+## Conflict detection (Phase 3)
+
+`az repos pr show --id <id> -o json` returns `mergeStatus` in the `PullRequestAsyncStatus`
+enum. The PR reports actual merge conflicts when `mergeStatus` is `"conflicts"`.
 
 ## Phase 4: Fetch full review state
 

@@ -7,14 +7,20 @@ the CLI fallback and are what to reach for directly in Claude Code.
 
 ## Resolving a bare PR number (Phase 1)
 
-`gh pr view <number> --json url,headRefName,baseRefName,title,body,reviews,statusCheckRollup,mergeable,files`
+`gh pr view <number> --json url,headRefName,baseRefName,title,body,reviews,statusCheckRollup,mergeable,mergeStateStatus,files`
 to get the full identifiers, metadata, review states, and check rollup in one call. Reuse this
 single output across Phases 1-4 instead of calling `gh pr view` repeatedly.
 
 ## Phase 2/3: Checkout and sync
 
 - `gh pr checkout <number>` checks out the PR's head branch locally.
-- Bringing the branch up to date is handled by `merge-default-branch` (Phase 3 of `SKILL.md`).
+- Syncing is handled by `land-pr` Phase 3 of `SKILL.md`.
+
+## Conflict detection (Phase 3)
+
+The `mergeable` and `mergeStateStatus` fields from the `gh pr view` JSON above indicate
+actual merge conflicts. The PR reports conflicts when `mergeStateStatus == "DIRTY"` or
+`mergeable == "CONFLICTING"`.
 
 ## Phase 4: Fetch full review state
 
