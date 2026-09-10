@@ -27,8 +27,9 @@ enum. The PR reports actual merge conflicts when `mergeStatus` is `"conflicts"`.
 
 - `az repos pr show --id <id> -o json` for metadata, `reviewers` (each with `vote` and
   `isRequired`), and `sourceRefName`/`targetRefName`.
-- Diff: `az repos pr diff` is not a standard command — use
-  `git diff <targetRefName>...<sourceRefName>` locally after fetching both refs.
+- Diff: only when an actionable thread or completed failing check requires code inspection,
+  use `git diff <targetRefName>...<sourceRefName>` locally after fetching both refs;
+  `az repos pr diff` is not a standard command.
 - Comment threads (not exposed by `az repos pr show`):
   ```
   az rest --method get \
@@ -64,6 +65,8 @@ enum. The PR reports actual merge conflicts when `mergeStatus` is `"conflicts"`.
 
 ## Phase 6: CI investigation and requeue
 
+Apply the required-reviewer approval gate in `SKILL.md` before retrying or freshly queueing an expired build.
+
 - Get the `buildId` for a failing/expired build policy from its `policyEvaluations` `context`.
 - Retry (rerun failed jobs of) the same build:
   ```
@@ -75,10 +78,11 @@ enum. The PR reports actual merge conflicts when `mergeStatus` is `"conflicts"`.
   az pipelines build queue --definition-id <defId> --branch <sourceRefName> --org <org> --project <project>
   ```
   Find `<defId>` from the same `policyEvaluations` context or `az pipelines build show --id <buildId>`.
-- Logs: `az pipelines build show --id <buildId>` for status, or the web UI link in the same
-  response, for the failing task's log.
+- Retrieve logs only for a completed unsuccessful build, selecting the failing task rather than
+  the entire build. Before staging output, apply `SKILL.md`'s per-check 400-line/40-KiB redacted
+  excerpt cap. `az pipelines build show --id <buildId>` provides status and the log/UI metadata.
 
-## Phase 7: Approval
+## Approval state
 
 `az repos pr show --id <id> -o json` → `reviewers[]`. Vote values: `10` = Approved,
 `5` = Approved with suggestions, `0` = No vote, `-5` = Waiting for author, `-10` = Rejected.

@@ -28,7 +28,7 @@ actual merge conflicts. The PR reports conflicts when `mergeStateStatus == "DIRT
 
 - Reuse the `gh pr view` output from Phase 1 for metadata, review states, and check rollup.
   Do not fetch it a second time.
-- `gh pr diff <number>` for the full diff.
+- Fetch `gh pr diff <number>` only when an actionable thread or completed failing check requires code inspection.
 - Review threads with resolved status are **not** exposed by REST; use GraphQL, then keep only
   unresolved threads unless the checkpoint shows a previously resolved thread may have new comments:
   ```
@@ -45,8 +45,8 @@ actual merge conflicts. The PR reports conflicts when `mergeStateStatus == "DIRT
   ```
 - Required reviewers/branch protection: `gh api repos/{owner}/{repo}/branches/{branch}/protection`
   (needs the actual base branch name from Phase 1).
-- CI check runs: `gh pr checks <number>` (add `--watch` to block until all finish, useful for
-  the bounded poll in Phase 6).
+- CI check runs: `gh pr checks <number>`. Capture the current snapshot once; do not add `--watch`
+  and do not query queued or running checks again during the invocation.
 
 ## Phase 5: Replying to and resolving threads
 
@@ -59,14 +59,17 @@ actual merge conflicts. The PR reports conflicts when `mergeStateStatus == "DIRT
 
 ## Phase 6: CI investigation and requeue
 
-- List runs for the branch: `gh run list --branch <branch> --json databaseId,status,conclusion,name`.
-- Logs for a failed run: `gh run view <run-id> --log-failed`.
-- Rerun only the failed jobs of a run (covers both "failed" and "expired/timed out" runs):
-  `gh run rerun <run-id> --failed`. If the whole run needs a fresh attempt: `gh run rerun <run-id>`.
-- If a check has no rerunnable run at all (e.g. never triggered / stuck queued), an empty
-  commit or a re-push is the fallback: `git commit --allow-empty -m "chore: retrigger checks"`.
+Apply the required-reviewer approval gate in `SKILL.md` before using either rerun command for an expired build.
 
-## Phase 7: Approval
+- List runs for the branch: `gh run list --branch <branch> --json databaseId,status,conclusion,name`.
+- Logs for a completed failed run: `gh run view <run-id> --log-failed`. Before staging them,
+  apply `SKILL.md`'s per-check 400-line/40-KiB redacted excerpt cap; never retain whole-run output.
+- Rerun only failed jobs of a completed failed/expired run: `gh run rerun <run-id> --failed`.
+  If the whole run needs a fresh attempt: `gh run rerun <run-id>`.
+- Never create an empty commit or re-push merely for a queued/running check. Record that state
+  from the single snapshot and stop.
+
+## Approval state
 
 - `gh pr view <number> --json reviews` — each entry has `state` (`APPROVED`, `CHANGES_REQUESTED`,
   `COMMENTED`, `DISMISSED`). GitHub has no partial-approval state, so `APPROVED` from every
