@@ -10,13 +10,17 @@ model: sonnet
 
 Task: $ARGUMENTS
 
-Invocation authorizes commits, normal pushes, thread replies/resolution, and eligible CI requeues on the PR branch. It does not authorize force-push, history rewriting, or merging. Run one bounded snapshot-based pass. Never wait, watch, sleep, or poll.
+Invocation authorizes commits, normal pushes, thread replies/resolution, and eligible CI requeues on the PR branch. It does not authorize force-push, history rewriting, or merging. Run one bounded snapshot-based pass. Never wait, watch, sleep, or poll remote state. Await each finite local validation command once; do not abandon it merely because the tool backgrounds it.
 
 ## Operating contract
 
-The coordinator owns remote state, classification, validation, commits, pushes, replies, resolutions, requeues, and reporting. `pr-fixer` is the only fix author; `code-reviewer` is read-only. Both use the invocation checkout, never a clone, worktree, sandbox copy, or dependency copy.
+The coordinator owns remote state, classification, validation, commits, pushes, replies, resolutions, requeues, and reporting. `pr-fixer` is the only fix author; `code-reviewer` is read-only. The coordinator must not edit repository files during remediation. Both agents use the invocation checkout, never a clone, worktree, sandbox copy, or dependency copy.
 
-Resolve agents in this order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` → `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`. Use the runtime-native dispatch mechanism. If dispatch requires another checkout, run the resolved agent instructions inline and disclose that review was not isolated.
+Resolve one Python 3 launcher without installing anything: try `python3`, then `python`, then `py -3`, stopping at the first command whose version is 3.9 or newer. Store the full launcher command as `<python>` and reuse it; do not probe again. While the working directory remains the invocation checkout, run `<python> <land-pr-skill-dir>/scripts/preflight.py "$ARGUMENTS" --create` once. Reuse its compact JSON for repository, platform, cleanliness, agent, context, checkpoint, handoff, and telemetry paths; do not rediscover those values with separate searches or help commands.
+
+Python is optional. If no supported launcher exists or a bundled script cannot run, do not install Python or stop solely for that reason. Resolve the same values with the documented host tools, execute the matching platform reference's exact bounded commands, append equivalent phase fields directly to `telemetry.jsonl` when the host can write it, and record `preflight-fallback`, `snapshot-fallback`, or `telemetry-fallback` in the checkpoint.
+
+Resolve agents in this order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` → `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`. Use the paths returned by preflight and the runtime-native dispatch mechanism. If dispatch is unavailable or requires another checkout, stop and report that the ownership gate cannot be satisfied; do not author fixes inline.
 
 Dispatch prompts contain only the task, absolute evidence/source paths, and the instruction to read only applicable files. Do not inline file contents. Reuse the current dependency installation and caches; do not restore/install merely to refresh them.
 
@@ -32,14 +36,18 @@ Reuse a caller-provided `session_context`; otherwise derive `<context_root>/<saf
 Read only the checkpoint fields needed to filter previously resolved threads before the remote
 snapshot. Defer project context and all other local loading until Phase 2.
 
+### Phase telemetry
+
+After each phase, append one event with `<python> <land-pr-skill-dir>/scripts/telemetry.py <telemetry_path> <phase>` and the observed tool-call, remote-call, byte, retry, reason, and outcome values. Record `fast-path-rejected`, `scope-expanded`, `fallback`, and validation-blocked reasons when applicable. Telemetry is diagnostic only and must not cause an otherwise valid pass to fail.
+
 ## Phase 1: Resolve platform and take one remote snapshot
 
-Parse a GitHub/Azure DevOps PR URL, or detect a bare PR number from `git remote get-url origin`. Read only the matching platform reference:
+Use the platform returned by preflight and read only the matching platform reference:
 
 - GitHub: `references/github.md`
 - Azure DevOps: `references/azure-devops.md`
 
-Fetch in the fewest calls and reuse the result: identifiers, title, source/base branch, conflict state, changed-file names, unresolved thread histories, required checks/policies, and required reviewer states. Fetch resolved threads only when a checkpoint says a resolved thread may have new comments. Do not fetch a diff or CI logs yet.
+Run `<python> <land-pr-skill-dir>/scripts/snapshot.py <platform> "$ARGUMENTS" --output <context_dir>/snapshot.json` once. Reuse its compact JSON for identifiers, title, source/base branch, commits, conflict state, changed-file names, unresolved thread histories, checks/policies, and reviewer states. Follow the matching reference only for data the script explicitly marks unresolved; do not use CLI help, retry alternate API versions, fetch broad raw payloads, a diff, or CI logs. If the script fails, use the reference's exact fallback commands once and record the fallback and error in telemetry.
 
 Classify each check from this snapshot only:
 
@@ -113,15 +121,16 @@ Pass source files by absolute checkout path; do not copy them. Complete when one
 
 Skip this phase when the combined batch has no fixable items.
 
-1. Dispatch `pr-fixer` once with `remediation.md`, scoped diff, actionable evidence, applicable standards, and source paths. It edits the working tree and drafts thread replies but does not validate, commit, push, reply, or resolve.
-2. Run targeted validation covering changed code and reproduced failures only.
-3. Regenerate the scoped diff and dispatch `code-reviewer` with `remediation.md`, the diff, applicable standards, and validation result.
-4. If BLOCKED, allow exactly one correction: dispatch `pr-fixer` with the review findings, then rerun targeted validation and `code-reviewer` once. If still BLOCKED, preserve the working tree and report the findings as blockers; do not loop again.
-5. When approved, run the repository's full required validation exactly once on the final working-tree state. If it fails, do not return to the correction loop; report the failure with evidence unless the failure is an immediately correctable command/environment issue that does not alter code.
-6. Commit all approved batch changes together using repository attribution conventions. Verify expected files with `git log -1 --stat`, then push normally once.
-7. Reply to and resolve each addressed thread using the final drafted replies and commit hash. Leave unaddressed/ambiguous threads open.
+1. Record the pre-fix changed paths, then dispatch `pr-fixer` once with `remediation.md`, scoped diff, actionable evidence, applicable standards, and source paths. It edits the working tree and drafts thread replies but does not validate, commit, push, reply, or resolve.
+2. Compare post-fix paths with the implicated paths and actionable-item count. If the fixer touched any unimplicated path or more than `max(5, 3 × actionable items)` files, require a path-by-path scope justification in its result, record `scope-expanded` in telemetry, and stop before validation when any path remains unjustified.
+3. Run targeted validation covering changed code and reproduced failures only.
+4. Regenerate the scoped diff and dispatch `code-reviewer` with `remediation.md`, the diff, applicable standards, validation result, and any scope-expansion justification.
+5. If BLOCKED, allow exactly one correction: dispatch `pr-fixer` with the review findings, then rerun targeted validation and `code-reviewer` once. If still BLOCKED, preserve the working tree and report the findings as blockers; do not loop again.
+6. When approved, run the repository's full required validation exactly once on the final working-tree state. Start it as one finite foreground command. If the tool backgrounds it, call the process-output tool once with a timeout long enough for the command to finish; this is awaiting local work, not polling remote state. If it remains in progress after that one await, preserve its process identifier and report `BLOCKED — waiting`, leaving remediation in progress. If it fails, do not return to the correction loop; report the failure with evidence unless the failure is an immediately correctable command/environment issue that does not alter code.
+7. Commit all approved batch changes together using repository attribution conventions. Verify expected files with `git log -1 --stat`, then push normally once.
+8. Reply to and resolve each addressed thread using the final drafted replies and commit hash. Leave unaddressed/ambiguous threads open.
 
-Do not validate the same working-tree state twice. Remote CI is the final full-gate confirmation after the push. Complete when the consolidated batch is pushed and resolved, or its exact blocker is recorded.
+Do not validate the same working-tree state twice. Remote CI is the final full-gate confirmation after the push. Complete when the consolidated batch is pushed and resolved, a completed validation failure is recorded, or an explicitly identified local validation process remains in progress.
 
 ## Phase 6: Handle expired checks and record post-push state
 
@@ -145,7 +154,10 @@ Write the checkpoint before reporting:
   "failed_fixes": [{"target":"", "pass":0, "approach":"", "result":""}],
   "outstanding_threads": [],
   "outstanding_checks": [],
-  "context_files_loaded": []
+  "context_files_loaded": [],
+  "telemetry_path": "<absolute path or null>",
+  "telemetry_fallbacks": [],
+  "phase_metrics": {"snapshot":{"tool_calls":0,"remote_calls":0,"retries":0,"reason":"","outcome":""}}
 }
 ```
 
