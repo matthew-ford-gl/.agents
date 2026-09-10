@@ -14,9 +14,9 @@ defaults or `git remote get-url origin`.
 
 ## Phase 2/3: Checkout and sync
 
-No single `az` command checks out a PR branch. Get `sourceRefName` from `az repos pr show`,
-then `git fetch origin <sourceRefName>:<local-branch>` and `git checkout <local-branch>`.
-Bringing the branch up to date is handled by `land-pr` Phase 3 of `SKILL.md`.
+Get `sourceRefName` from `az repos pr show`, fetch only that ref into a remote-tracking ref, then
+switch the invocation checkout with `git switch` as specified by `land-pr` Phase 2. Do not create
+or enter another worktree or clone. Bringing the branch up to date is handled by `land-pr` Phase 3.
 
 ## Conflict detection (Phase 3)
 

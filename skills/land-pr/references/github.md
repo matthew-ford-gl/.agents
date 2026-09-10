@@ -13,7 +13,9 @@ single output across Phases 1-4 instead of calling `gh pr view` repeatedly.
 
 ## Phase 2/3: Checkout and sync
 
-- `gh pr checkout <number>` checks out the PR's head branch locally.
+- Reuse the invocation checkout. Read `headRefName` from PR metadata, fetch only the required
+  remote ref, and switch the current checkout with `git switch` as specified by `land-pr` Phase 2.
+  Do not use `gh pr checkout`; the branch switch must happen directly in the invocation checkout.
 - Syncing is handled by `land-pr` Phase 3 of `SKILL.md`.
 
 ## Conflict detection (Phase 3)
