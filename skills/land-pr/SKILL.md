@@ -16,7 +16,9 @@ Invocation authorizes commits, normal pushes, thread replies/resolution, and eli
 
 The coordinator owns remote state, classification, validation, commits, pushes, replies, resolutions, requeues, and reporting. `pr-fixer` is the only fix author; `code-reviewer` is read-only. The coordinator must not edit repository files during remediation. Both agents use the invocation checkout, never a clone, worktree, sandbox copy, or dependency copy.
 
-While the working directory remains the invocation checkout, run `python <land-pr-skill-dir>/scripts/preflight.py "$ARGUMENTS" --create` once. Reuse its compact JSON for repository, platform, cleanliness, agent, context, checkpoint, handoff, and telemetry paths; do not rediscover those values with separate searches or help commands. If Python or the script cannot run, perform the documented resolution inline and record `preflight-fallback` in telemetry.
+Resolve one Python 3 launcher without installing anything: try `python3`, then `python`, then `py -3`, stopping at the first command whose version is 3.9 or newer. Store the full launcher command as `<python>` and reuse it; do not probe again. While the working directory remains the invocation checkout, run `<python> <land-pr-skill-dir>/scripts/preflight.py "$ARGUMENTS" --create` once. Reuse its compact JSON for repository, platform, cleanliness, agent, context, checkpoint, handoff, and telemetry paths; do not rediscover those values with separate searches or help commands.
+
+Python is optional. If no supported launcher exists or a bundled script cannot run, do not install Python or stop solely for that reason. Resolve the same values with the documented host tools, execute the matching platform reference's exact bounded commands, append equivalent phase fields directly to `telemetry.jsonl` when the host can write it, and record `preflight-fallback`, `snapshot-fallback`, or `telemetry-fallback` in the checkpoint.
 
 Resolve agents in this order: `.devin/agents/<name>/AGENT.md` → `.claude/agents/<name>.md` → `~/.agents/agents/<name>/AGENT.md` → `~/.claude/agents/<name>.md`. Use the paths returned by preflight and the runtime-native dispatch mechanism. If dispatch is unavailable or requires another checkout, stop and report that the ownership gate cannot be satisfied; do not author fixes inline.
 
@@ -36,7 +38,7 @@ snapshot. Defer project context and all other local loading until Phase 2.
 
 ### Phase telemetry
 
-After each phase, append one event with `python <land-pr-skill-dir>/scripts/telemetry.py <telemetry_path> <phase>` and the observed tool-call, remote-call, byte, retry, reason, and outcome values. Record `fast-path-rejected`, `scope-expanded`, `fallback`, and validation-blocked reasons when applicable. Telemetry is diagnostic only and must not cause an otherwise valid pass to fail.
+After each phase, append one event with `<python> <land-pr-skill-dir>/scripts/telemetry.py <telemetry_path> <phase>` and the observed tool-call, remote-call, byte, retry, reason, and outcome values. Record `fast-path-rejected`, `scope-expanded`, `fallback`, and validation-blocked reasons when applicable. Telemetry is diagnostic only and must not cause an otherwise valid pass to fail.
 
 ## Phase 1: Resolve platform and take one remote snapshot
 
@@ -45,7 +47,7 @@ Use the platform returned by preflight and read only the matching platform refer
 - GitHub: `references/github.md`
 - Azure DevOps: `references/azure-devops.md`
 
-Run `python <land-pr-skill-dir>/scripts/snapshot.py <platform> "$ARGUMENTS" --output <context_dir>/snapshot.json` once. Reuse its compact JSON for identifiers, title, source/base branch, commits, conflict state, changed-file names, unresolved thread histories, checks/policies, and reviewer states. Follow the matching reference only for data the script explicitly marks unresolved; do not use CLI help, retry alternate API versions, fetch broad raw payloads, a diff, or CI logs. If the script fails, use the reference's exact fallback commands once and record the fallback and error in telemetry.
+Run `<python> <land-pr-skill-dir>/scripts/snapshot.py <platform> "$ARGUMENTS" --output <context_dir>/snapshot.json` once. Reuse its compact JSON for identifiers, title, source/base branch, commits, conflict state, changed-file names, unresolved thread histories, checks/policies, and reviewer states. Follow the matching reference only for data the script explicitly marks unresolved; do not use CLI help, retry alternate API versions, fetch broad raw payloads, a diff, or CI logs. If the script fails, use the reference's exact fallback commands once and record the fallback and error in telemetry.
 
 Classify each check from this snapshot only:
 
@@ -153,7 +155,8 @@ Write the checkpoint before reporting:
   "outstanding_threads": [],
   "outstanding_checks": [],
   "context_files_loaded": [],
-  "telemetry_path": "<absolute path>",
+  "telemetry_path": "<absolute path or null>",
+  "telemetry_fallbacks": [],
   "phase_metrics": {"snapshot":{"tool_calls":0,"remote_calls":0,"retries":0,"reason":"","outcome":""}}
 }
 ```
