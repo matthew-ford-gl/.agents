@@ -1,6 +1,6 @@
 ---
 name: land-pr
-description: "Takes a GitHub or Azure DevOps PR, resolves actionable review feedback, fixes completed failing CI, requeues eligible expired builds, and verifies merge readiness in one bounded pass without monitoring running checks. Use when asked to land, finish, or get an existing PR ready to merge. Not for: polling CI, opening a PR, static review without fixes, or merging the PR."
+description: "Autonomously takes over a GitHub or Azure DevOps PR branch, resolves actionable review feedback and failed CI, runs CI-equivalent pre-push checks, commits and pushes the fixes, resolves addressed threads, and reports remaining remote gates. Use when asked to land, finish, or get an existing PR ready to merge. Not for: opening a PR, static review without fixes, force-pushing, or merging the PR."
 argument-hint: "<PR number or URL (GitHub or Azure DevOps)>"
 disable-model-invocation: true
 model: sonnet
@@ -10,7 +10,7 @@ model: sonnet
 
 Task: $ARGUMENTS
 
-Invocation authorizes commits, normal pushes, thread replies/resolution, and eligible CI requeues on the PR branch. It does not authorize force-push, history rewriting, or merging. Run one bounded snapshot-based pass. Never wait, watch, sleep, or poll remote state. Await each finite local validation command once; do not abandon it merely because the tool backgrounds it.
+Invocation authorizes switching the clean invocation checkout to the PR branch, commits, normal pushes, thread replies/resolution, and eligible CI requeues. It does not authorize force-push, history rewriting, merging, or altering unrelated local work. Work autonomously until every discovered actionable review or CI defect is fixed and delivered, or a concrete non-actionable blocker is proven. Never ask the user to perform an ordinary workflow step that this invocation authorizes. Never wait, watch, sleep, or poll remote state; await finite local commands until they finish.
 
 ## Operating contract
 
@@ -76,11 +76,12 @@ Require a clean index/worktree with no untracked paths that checkout could overw
 
 Read the checkpoint when present. Discard it if it names another PR. Track:
 
-- `pass_number`: prior invocations that attempted a fix, conflict sync, or requeue
+- `pass_number`: invocations that attempted a fix, conflict sync, or requeue
 - `resolved_threads`, `green_checks`, and `context_files_loaded`
-- `failed_fixes`: target, approach, and result
+- `failed_fixes`: target, failure fingerprint, approach, and result
+- `validation_cycles`: failure fingerprint, implicated paths, and disposition
 
-Increment `pass_number` once immediately before this invocation's first fix, conflict sync, or requeue. Read-only invocations do not increment it. If that would exceed 4, write the current state, attempts, and suggested human actions to `handoff_path`, report it, and stop. After two distinct failed approaches for one target across passes, make it a human-decision blocker.
+Increment `pass_number` once immediately before this invocation's first fix, conflict sync, or requeue. Read-only invocations do not increment it. A prior pass limit never prevents this invocation from completing ordinary actionable work. Continue autonomously unless the same failure fingerprint remains after two materially distinct root-cause fixes, evidence is insufficient, or proceeding requires an unauthorized destructive operation or product decision. Record that exact blocker and the attempted approaches; do not use a generic pass-limit blocker.
 
 Fetch only the source branch and switch this checkout using `git switch`; do not use a platform checkout command. If another worktree owns the branch, report its path and ask the user. Do not force or delete it.
 
@@ -88,7 +89,7 @@ Complete when relevant instructions are loaded, pass state is valid, and the cle
 
 ## Phase 3: Resolve reported conflicts
 
-Only when the Phase 1 snapshot reports actual conflicts, fetch the remote default branch and integrate it according to repository policy. Invoke `resolving-merge-conflicts` for conflict resolution. Never use blanket `ours`/`theirs`. If policy requires rebase, ask before the required force-push. For a merge, run applicable integration validation, commit when needed, verify with `git log -1 --stat`, and push normally. Stop on non-fast-forward rejection.
+Only when the Phase 1 snapshot reports actual conflicts, fetch the remote default branch and integrate it according to repository policy. Invoke `resolving-merge-conflicts` for conflict resolution. Never use blanket `ours`/`theirs`. If policy requires rebase, ask before the required force-push. For a merge, run applicable integration validation, commit when needed, verify with `git log -1 --stat`, and push normally. On non-fast-forward rejection, fetch the updated source ref, integrate it without rewriting history, rerun affected validation, and retry the normal push.
 
 Do not update a merely-behind branch. Complete when no conflicts were reported or reported conflicts are resolved and pushed.
 
@@ -117,20 +118,21 @@ CI log excerpts have a hard cap of 400 lines and 40 KiB per check after secret r
 
 Pass source files by absolute checkout path; do not copy them. Complete when one minimal batch contains every fixable item.
 
-## Phase 5: One fix, review, and correction cycle
+## Phase 5: Converge, validate, and deliver
 
-Skip this phase when the combined batch has no fixable items.
+Skip remediation only when the combined batch has no fixable items. Otherwise continue this phase without user interaction until the working tree is reviewed, all applicable local gates pass, and the changes are pushed.
 
-1. Record the pre-fix changed paths, then dispatch `pr-fixer` once with `remediation.md`, scoped diff, actionable evidence, applicable standards, and source paths. It edits the working tree and drafts thread replies but does not validate, commit, push, reply, or resolve.
-2. Compare post-fix paths with the implicated paths and actionable-item count. If the fixer touched any unimplicated path or more than `max(5, 3 × actionable items)` files, require a path-by-path scope justification in its result, record `scope-expanded` in telemetry, and stop before validation when any path remains unjustified.
-3. Run targeted validation covering changed code and reproduced failures only.
-4. Regenerate the scoped diff and dispatch `code-reviewer` with `remediation.md`, the diff, applicable standards, validation result, and any scope-expansion justification.
-5. If BLOCKED, allow exactly one correction: dispatch `pr-fixer` with the review findings, then rerun targeted validation and `code-reviewer` once. If still BLOCKED, preserve the working tree and report the findings as blockers; do not loop again.
-6. When approved, run the repository's full required validation exactly once on the final working-tree state. Start it as one finite foreground command. If the tool backgrounds it, call the process-output tool once with a timeout long enough for the command to finish; this is awaiting local work, not polling remote state. If it remains in progress after that one await, preserve its process identifier and report `BLOCKED — waiting`, leaving remediation in progress. If it fails, do not return to the correction loop; report the failure with evidence unless the failure is an immediately correctable command/environment issue that does not alter code.
-7. Commit all approved batch changes together using repository attribution conventions. Verify expected files with `git log -1 --stat`, then push normally once.
-8. Reply to and resolve each addressed thread using the final drafted replies and commit hash. Leave unaddressed/ambiguous threads open.
+1. Record the pre-fix changed paths, then dispatch `pr-fixer` with `remediation.md`, scoped diff, actionable evidence, applicable standards, and source paths. It edits the working tree and drafts thread replies but does not validate, commit, push, reply, or resolve.
+2. Compare post-fix paths with the implicated paths and actionable-item count. If the fixer touched any unimplicated path or more than `max(5, 3 × actionable items)` files, require a path-by-path necessity justification. Record `scope-expanded`; dispatch a correction for unjustified paths rather than stopping. Stop only if the fixer cannot justify or revert them without discarding unrelated user work.
+3. Run targeted validation covering every changed subsystem and reproduced failure. Fingerprint each failure by command, failing test/task, and normalized error. A newly exposed failure in the same PR, changed subsystem, or required pre-push gate is a new actionable item, not scope creep: add its bounded evidence to `remediation.md`, dispatch `pr-fixer`, and rerun affected targeted validation. Do not rerun passing unrelated gates after an unchanged working-tree state.
+4. Regenerate the scoped diff and dispatch `code-reviewer` with the current `remediation.md`, diff, applicable standards, validation results, and scope justifications. For every BLOCKED result, add Must-fix findings to the batch, dispatch `pr-fixer`, rerun affected targeted validation, and review the new diff. Continue until APPROVED. Treat Should-fix as blocking only when a supplied standard makes it mandatory.
+5. Stop the convergence loop only when the same failure or reviewer finding remains after two materially distinct fixes, the evidence cannot support a safe change, an external dependency makes local validation impossible, or the required action is unauthorized. Preserve the working tree and report the exact fingerprint, evidence, and attempted fixes. Never stop merely because a correction count, pass count, or arbitrary cycle limit was reached.
+6. Once targeted checks pass and review approves, derive the pre-push suite from repository instructions and the CI definitions for every affected required policy. Run formatting, lint, type checking, builds, tests, security/package gates, and other commands CI will execute, using the same configuration where locally possible. Run the final suite on the final working-tree state. Await backgrounded finite commands until completion; do not misclassify local process completion as remote polling.
+7. If the pre-push suite exposes an actionable code, test, fixture, dependency-lock, or configuration failure, add its bounded evidence to the same batch and return to step 1. If it exposes a command/environment problem, correct the command or use the documented local equivalent and continue. Only an evidenced external prerequisite that cannot be reproduced locally is a blocker.
+8. When the final suite passes, require a non-empty intended diff, no untracked build artifacts, and no unjustified paths. Commit all approved changes together using repository attribution conventions, verify expected files with `git log -1 --stat`, and push normally. On non-fast-forward rejection, fetch and integrate according to repository policy, rerun affected validation, then push; never force-push.
+9. Reply to and resolve every addressed thread using the final drafted replies and commit hash. Leave only genuinely ambiguous, disputed, or externally owned threads open.
 
-Do not validate the same working-tree state twice. Remote CI is the final full-gate confirmation after the push. Complete when the consolidated batch is pushed and resolved, a completed validation failure is recorded, or an explicitly identified local validation process remains in progress.
+Remote CI is the final full-gate confirmation after the push, but queued or running remote checks do not invalidate delivered work. Complete when all locally actionable work is committed and pushed and every addressed thread is resolved, or when a precise non-actionable blocker is recorded.
 
 ## Phase 6: Handle expired checks and record post-push state
 
@@ -151,7 +153,9 @@ Write the checkpoint before reporting:
   "timestamp": "<ISO 8601>",
   "resolved_threads": [],
   "green_checks": [],
-  "failed_fixes": [{"target":"", "pass":0, "approach":"", "result":""}],
+  "failed_fixes": [{"target":"", "fingerprint":"", "pass":0, "approach":"", "result":""}],
+  "validation_cycles": [{"fingerprint":"", "paths":[], "disposition":""}],
+  "delivery": {"working_tree_clean":false,"committed":false,"pushed":false,"addressed_threads_resolved":false,"final_snapshot_recorded":false},
   "outstanding_threads": [],
   "outstanding_checks": [],
   "context_files_loaded": [],
@@ -161,11 +165,14 @@ Write the checkpoint before reporting:
 }
 ```
 
-Report title/URL, verdict, pass, branch/conflict state, resolved threads, green/total required checks, approvals, blockers/waits, and next action.
+Before reporting, assert and record the delivery state from direct evidence: current branch is the PR source branch; no intended tracked changes remain uncommitted; no generated artifacts remain; the delivered commit is on the remote source ref; every addressed thread is resolved; and the final remote state or newly triggered run identifiers are recorded. Never emit a success-like verdict when an intended fix remains only in the working tree.
 
-- `READY TO MERGE`: no conflicts, all threads resolved, all required checks green, and all required reviewers fully approved. Stop; never merge.
-- `BLOCKED — waiting`: only running/queued CI or reviewers remain.
-- `BLOCKED — human decision`: ambiguity, disagreement, insufficient evidence, external failure, exhausted approaches, or failed reviewer gate.
-- `BLOCKED — actionable`: continue only if an unprocessed actionable item remains in this same bounded pass.
+Report title/URL, verdict, pass, branch/conflict state, commit/push evidence, resolved threads, green/total required checks, approvals, blockers/waits, and next action.
 
-Retain `context_dir` for diagnostics and report its path when it was created. On READY, remove only checkpoint/handoff files. Otherwise retain them. Complete when the verdict cites concrete evidence for every open item.
+- `READY TO MERGE`: delivery assertions pass, no conflicts or unresolved threads remain, all required checks are green, and all required reviewers fully approve. Stop; never merge.
+- `DELIVERED — remote gates pending`: delivery assertions pass and only newly triggered/running/queued CI or reviewers remain. No user action is requested.
+- `BLOCKED — external`: all locally actionable work is delivered, but a named external policy, infrastructure prerequisite, permission, or product decision prevents readiness.
+- `INCOMPLETE — local blocker`: intended changes could not be safely delivered because of a repeated failure fingerprint, insufficient evidence, unauthorized operation, dirty user work, or occupied worktree. Include exact evidence and attempted approaches.
+- An unprocessed actionable thread, failed local gate, uncommitted intended change, unpushed commit, or addressed-but-open thread is never a terminal verdict; return to the applicable phase.
+
+Retain `context_dir` for diagnostics and report its path when it was created. On READY, remove only checkpoint/handoff files. Otherwise retain them. Complete when the delivery assertions pass or a precise non-actionable local blocker is evidenced.
