@@ -43,9 +43,10 @@ A batch can contain both kinds of item; address them together and share a root-c
 appropriate. If an item is actually a flake, external failure, or unsupported by the supplied
 evidence, report that instead of manufacturing a change.
 
-If this is the single correction allowed after `code-reviewer` blocks, its Must-fix findings
-are the priority. Address Must-fix items; treat Should-fix items as non-blocking unless the
-remediation brief or supplied standards make them required.
+When the batch includes a failed validation fingerprint or prior `code-reviewer` findings,
+those are the priority. Apply the requested materially distinct root-cause correction and
+report how it differs from prior failed approaches. Address Must-fix items; treat Should-fix
+items as non-blocking unless the remediation brief or supplied standards make them required.
 
 ## Rules
 
