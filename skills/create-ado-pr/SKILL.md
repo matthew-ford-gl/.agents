@@ -2,6 +2,7 @@
 name: create-ado-pr
 description: "Creates a well-formed Azure DevOps pull request with reviewed title, Markdown description, source/target branches, and repository coordinates by using Azure CLI safely. Use when explicitly asked to create, open, or raise a new PR in Azure DevOps. Not for: GitHub PRs, reviewing or updating an existing PR, pushing branches, completing or merging PRs."
 argument-hint: "[source branch] [target branch] [optional title/work items]"
+model: swe
 ---
 
 # Create Azure DevOps PR
