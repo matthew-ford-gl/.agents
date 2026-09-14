@@ -12,3 +12,6 @@
 !agents/**
 !hooks/
 !hooks/**
+!.devin/
+!.devin/skills/
+!.devin/skills/**
