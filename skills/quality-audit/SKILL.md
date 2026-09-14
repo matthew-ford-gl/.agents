@@ -1,6 +1,6 @@
 ---
 name: quality-audit
-description: "Run a parallel code quality audit — SOLID, naming, complexity, clean-code smells — across a path, diff, or repo. Use when asked to audit code quality, review for SOLID/complexity/smells, or run a quality pass on a diff or repo. Not for: architecture-level design review (use architecture-audit), security review, or PR requirements compliance."
+description: "Runs a parallel code quality audit and turns its findings into a prioritised, phased remediation plan with coverage accounting. Use when asked to audit code quality, review for SOLID/complexity/smells, run a quality pass, or identify and sequence quality improvements across a path, diff, or repo. Not for: architecture-level design review (use architecture-audit), security review, PR requirements compliance, or implementing fixes."
 argument-hint: "[path | glob | diff | (empty = whole repo)]"
 model: sonnet  # sonnet is sufficient for mechanical per-chunk pattern-matching (SOLID/naming/complexity/smells); no need for opus-level reasoning
 ---
@@ -9,7 +9,7 @@ You are running a code quality audit. Task: `$ARGUMENTS`
 
 ## What This Command Does
 
-The target file set is split into chunks, and the same `quality-auditor` persona runs on each chunk in parallel — each pass checks all four dimensions (SOLID, Naming & Clean Code, Complexity, Code Smells & Duplication) but only for the files in its chunk. This keeps each call's context to one slice of the codebase instead of paying for the full file set on every dimension. Findings are consolidated into one severity-ranked report. Read-only: no files are modified.
+The target file set is split into chunks, and the same `quality-auditor` persona runs on each chunk in parallel — each pass checks all four dimensions (SOLID, Naming & Clean Code, Complexity, Code Smells & Duplication) but only for the files in its chunk. Findings are consolidated into one severity-ranked report, then handed to `report-remediation-planner` to produce a prioritised, phased programme with complete finding coverage. Read-only: no production files are modified.
 
 ---
 
@@ -55,7 +55,9 @@ Give every pass: the file contents (not paths) for its assigned chunk only, and 
 
 ## Step 5: Consolidate
 
-Collect every chunk's report across all waves. Merge into one findings list, sorted by severity (Critical → Major → Minor), then by file path. Sum the per-dimension counts across chunks.
+Collect every chunk's report across all waves. Merge duplicates without dropping aliases, assign each distinct finding a stable ID (`QA-001`, `QA-002`, etc.), and sort by severity (Critical → Major → Minor), then by file path. Preserve each finding's location, dimension/rule, issue, proposed fix, and source chunk. Sum the per-dimension counts across chunks.
+
+Complete when every distinct finding has one stable ID and the severity and dimension totals reconcile to the consolidated list.
 
 ## Step 6: Report
 
@@ -69,13 +71,13 @@ CODE QUALITY AUDIT — {target}
 Files scanned: {n}
 
 Critical ({n}):
-  {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
+  {stable ID} — {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
 
 Major ({n}):
-  {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
+  {stable ID} — {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
 
 Minor ({n}):
-  {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
+  {stable ID} — {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
 
 By dimension:  SOLID {c}/{m}/{n}   Naming {c}/{m}/{n}   Complexity {c}/{m}/{n}   Smells {c}/{m}/{n}
 (critical/major/minor)
@@ -84,8 +86,16 @@ Any dimension that could not run: {name it, or omit this line}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Findings only — no changes are made in this step.
+Complete when the human can see the full stable-ID audit and its reconciled totals.
 
-## Step 7: Fix Plan (only if the human asks for fixes)
+## Step 7: Produce the Phased Remediation Plan
 
-If the human asks to act on the findings, read `references/fix-plan.md` now for the resumable plan-file location, format, and update rules, and follow it exactly. Do not improvise a plan file location.
+If there are two or more findings, invoke `report-remediation-planner` and pass the complete consolidated audit from Step 6 as its report input. Follow that skill as the authority for finding ledger fields, duplicate accounting, workstreams, phase sequencing, acceptance criteria, coverage gates, and output order. Keep the `QA-*` IDs unchanged so every audit finding remains traceable through the plan.
+
+If the planner skill cannot be resolved, stop after the audit and tell the human that the review succeeded but the phased plan could not be produced; name the missing skill rather than substituting an ad hoc checklist.
+
+If there is exactly one finding, do not invoke the multi-finding planner. Add a single-issue remediation section containing the finding ID, objective, prerequisite, acceptance criterion, and closure check. If there are no findings, state that no remediation plan is needed.
+
+Print the plan directly after the audit unless the human requested an output file; in that case, let `report-remediation-planner` apply its output-file behavior. Do not implement fixes, open tickets, or modify production code.
+
+Complete when every audit finding maps to exactly one phased workstream and acceptance criterion, or the zero/single-finding branch has been reported explicitly.
