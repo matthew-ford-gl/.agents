@@ -37,11 +37,33 @@ def load_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def artifact_root(explicit=None):
+def context_root(repo, explicit=None):
+    candidates = []
     if explicit:
-        return Path(explicit).expanduser().resolve()
-    configured = os.environ.get("DEVIN_ARTIFACTS_DIR")
-    return Path(configured).expanduser().resolve() if configured else (Path.home() / "artifacts").resolve()
+        candidates.append(Path(explicit))
+    if os.environ.get("CONTEXT_STORAGE_PATH"):
+        candidates.append(Path(os.path.expandvars(os.path.expanduser(os.environ["CONTEXT_STORAGE_PATH"]))))
+    for config in (repo / ".devin" / "agent-context.json", Path.home() / ".config" / "devin" / "agent-context.json"):
+        if not config.is_file():
+            continue
+        try:
+            value = json.loads(config.read_text(encoding="utf-8")).get("root")
+        except (OSError, json.JSONDecodeError):
+            continue
+        if value:
+            candidate = Path(os.path.expandvars(os.path.expanduser(value)))
+            candidates.append(candidate if candidate.is_absolute() else config.parent / candidate)
+    candidates.extend((Path(tempfile.gettempdir()), repo / ".tmp"))
+    for candidate in candidates:
+        try:
+            candidate = candidate.expanduser().resolve()
+            candidate.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix=".quality-audit-probe-", dir=candidate):
+                pass
+            return candidate
+        except OSError:
+            continue
+    raise ValueError("no writable context root")
 
 
 def manifest_entries(manifest_path, repo):
@@ -119,7 +141,7 @@ def command_init(args):
     standard = Path(args.standard).expanduser().resolve()
     entries = manifest_entries(args.manifest, repo)
     fingerprint = session_fingerprint(repo, args.target, args.revision, standard, entries)
-    root = artifact_root(args.artifact_root) / "quality-audit"
+    root = context_root(repo, args.context_root) / slug(repo.name) / "quality-audit"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     name = slug(args.session) if args.session else f"{slug(Path(args.target).name)}-{args.revision[:7]}-{timestamp}"
     session = root / name
@@ -272,7 +294,7 @@ def parser():
     init.add_argument("--revision", required=True)
     init.add_argument("--standard", required=True)
     init.add_argument("--manifest", required=True)
-    init.add_argument("--artifact-root")
+    init.add_argument("--context-root")
     init.add_argument("--session")
     init.set_defaults(handler=command_init)
     wave = commands.add_parser("next-wave")

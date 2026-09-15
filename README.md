@@ -150,7 +150,7 @@ The hook POSTs to `POST /api/alerts/aialert?apikey=<key>` with:
 
 ## Context Storage Conventions
 
-Agents and skills that write temporary files (reviewer context, checkpoints, handoff documents) must store them under a resolved `context_root` rather than hardcoding paths. The canonical definition lives in `agents/orchestrator/AGENT.md` § *Context workspace*; every consumer must follow the same precedence chain:
+Agents and skills that write temporary or resumable files (reviewer context, checkpoints, audit evidence, handoff documents) must store them under a resolved `context_root` rather than hardcoding paths. The canonical definition lives in `agents/orchestrator/AGENT.md` § *Context workspace*; every consumer must follow the same precedence chain. `CONTEXT_STORAGE_PATH` is the tool-agnostic environment variable for this root; do not introduce host-specific aliases such as `DEVIN_ARTIFACTS_DIR`.
 
 | Priority | Source | Example |
 |----------|--------|---------|
@@ -169,10 +169,11 @@ Context paths are scoped to avoid collisions between concurrent sessions and bet
 | Scope | Pattern | Used by |
 |-------|---------|---------|
 | Session | `<context_root>/<repo>/<session-id>/<skill-or-agent>/` | `orchestrator` (reviewer context, staged files, diffs) |
+| Audit | `<context_root>/<repo>/quality-audit/<target-revision-time>/` | `quality-audit` (manifest, resumable chunk state, worker evidence, final plan) |
 | PR | `<context_root>/<repo>/land-pr-checkpoint-<pr-id>.json` | `land-pr` (checkpoint survives across `/loop` re-invocations) |
 | PR | `<context_root>/<repo>/land-pr-handoff-<pr-id>.md` | `land-pr` (max-pass escalation handoff) |
 
-**Session-scoped** paths use a runtime session ID (or a one-time UUID) and are cleaned up by the owning agent when the workflow completes. **PR-scoped** paths use a filesystem-safe PR identifier and persist across sessions until the PR is merged or the user deletes them.
+**Session-scoped** paths use a runtime session ID (or a one-time UUID) and are cleaned up by the owning agent when the workflow completes. **Audit-scoped** paths include the target, revision, and creation time, and persist so incomplete multi-wave audits can resume without repeating accepted work. **PR-scoped** paths use a filesystem-safe PR identifier and persist across sessions until the PR is merged or the user deletes them.
 
 ### `.tmp/` and `.gitignore`
 

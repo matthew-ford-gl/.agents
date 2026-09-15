@@ -15,7 +15,7 @@ Audit a target in parallel, consolidate every finding once, and write one self-c
 
 - Stop if the target resolves to no files or the `quality-auditor` agent cannot be resolved.
 - For a small target, one auditor pass is the fast path. Otherwise use the persistent session harness and run up to eight passes per wave until every chunk is accepted.
-- Persist manifests, worker returns, reconciliation state, and the final plan under the artifact root; keep bulky worker output out of the main context.
+- Persist manifests, worker returns, reconciliation state, and the final plan under the shared context root; keep bulky worker output out of the main context.
 - Keep final extraction, stable IDs, coverage, and plan synthesis in the orchestrator. Subagents inspect only their assigned chunks and return self-contained results.
 - Never stop merely because the audit requires many chunks or waves. If the host interrupts a run, preserve the session as resumable work rather than manufacturing a `NOT READY` remediation plan from uninspected files.
 - If planning cannot be completed because of an actual source or worker failure, preserve the session and report the exact blocker. Do not emit a partial plan as executor-ready.
@@ -31,11 +31,11 @@ Complete when the cost, fallback, and non-applicability branches are resolved.
    - path or glob: resolve it and expand directories while respecting `.gitignore`.
    - empty: prefer `git ls-files`; otherwise glob from the repository root.
 4. Exclude generated, vendored, binary, build-output, lock, and VCS paths. Record every included repository-relative path in a JSON scan manifest.
-5. Resolve the artifact root from `DEVIN_ARTIFACTS_DIR` when set, otherwise `~/artifacts`. Store this audit beneath `<artifact-root>/quality-audit/`; never put session state in the audited repository.
-6. Create or resume the session with `python <skill-dir>/scripts/audit_session.py init --repo <repo> --target <target> --revision <revision> --standard <standard> --manifest <manifest> [--artifact-root <root>] [--session <stable-name>]`. Let the script generate `<target-slug>-<short-revision>-<UTC timestamp>` unless an established session name exists. Reuse a named session only when its input fingerprint matches.
-7. Use `<session>/CODE-QUALITY-REMEDIATION.md` as the output path. Treat `<session>/state.json` as authoritative orchestration state, `<session>/results/` as accepted worker evidence, and `<session>/retries/` as rejected evidence.
+5. Resolve `context_root` using the canonical precedence documented in the repository `README.md` under **Context Storage Conventions**: `CONTEXT_STORAGE_PATH`; repository `.devin/agent-context.json`; `~/.config/devin/agent-context.json`; writable host temporary directory; ignored repository `.tmp`. The harness probes candidates and continues past inaccessible roots. If `.tmp` is selected, ensure it is ignored without duplicating a rule.
+6. Create or resume the session with `python <skill-dir>/scripts/audit_session.py init --repo <repo> --target <target> --revision <revision> --standard <standard> --manifest <manifest> [--context-root <root>] [--session <stable-name>]`. Let the script generate `<target-slug>-<short-revision>-<UTC timestamp>` unless an established session name exists. Reuse a named session only when its input fingerprint matches.
+7. Store the session at `<context_root>/<repo-name>/quality-audit/<session-name>/` and use `<session>/CODE-QUALITY-REMEDIATION.md` as the output path. Treat `<session>/state.json` as authoritative orchestration state, `<session>/results/` as accepted worker evidence, and `<session>/retries/` as rejected evidence.
 
-Complete when the repository boundary, standards, auditor definition, non-empty scan manifest, artifact root, and matching persistent session are fixed.
+Complete when the repository boundary, standards, auditor definition, non-empty scan manifest, context root, and matching persistent session are fixed.
 
 ## 2. Chunk, validate, audit, and reconcile
 

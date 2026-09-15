@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -27,12 +28,13 @@ class AuditSessionTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def run_script(self, *arguments, check=True):
+    def run_script(self, *arguments, check=True, env=None):
         return subprocess.run(
             [sys.executable, str(SCRIPT), *map(str, arguments)],
             check=check,
             capture_output=True,
             text=True,
+            env=env,
         )
 
     def create_session(self, sizes, name="session"):
@@ -52,7 +54,7 @@ class AuditSessionTests(unittest.TestCase):
             "--revision", "abcdef123456",
             "--standard", self.standard,
             "--manifest", manifest,
-            "--artifact-root", self.root / "artifacts",
+            "--context-root", self.root / "context",
             "--session", name,
         )
         return Path(result.stdout.strip()), paths
@@ -103,6 +105,27 @@ class AuditSessionTests(unittest.TestCase):
         self.assertEqual("blocked", state["status"])
         self.assertEqual("failed", state["chunks"][0]["status"])
 
+    def test_context_storage_path_is_the_primary_default(self):
+        source = self.repo / "src" / "file.py"
+        source.parent.mkdir(parents=True)
+        source.write_text("value = 1", encoding="utf-8")
+        manifest = self.root / "context-manifest.json"
+        manifest.write_text(json.dumps(["src/file.py"]), encoding="utf-8")
+        configured = self.root / "configured-context"
+        env = os.environ.copy()
+        env["CONTEXT_STORAGE_PATH"] = str(configured)
+        result = self.run_script(
+            "init",
+            "--repo", self.repo,
+            "--target", "src",
+            "--revision", "abcdef123456",
+            "--standard", self.standard,
+            "--manifest", manifest,
+            "--session", "environment-session",
+            env=env,
+        )
+        self.assertEqual(configured.resolve() / "repo" / "quality-audit" / "environment-session", Path(result.stdout.strip()))
+
     def test_rejects_session_name_reuse_with_different_inputs(self):
         self.create_session([100])
         result = self.run_script(
@@ -112,7 +135,7 @@ class AuditSessionTests(unittest.TestCase):
             "--revision", "abcdef123456",
             "--standard", self.standard,
             "--manifest", self.root / "manifest.json",
-            "--artifact-root", self.root / "artifacts",
+            "--context-root", self.root / "context",
             "--session", "session",
             check=False,
         )
