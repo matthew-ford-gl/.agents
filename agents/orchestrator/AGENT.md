@@ -244,13 +244,35 @@ session, and readable by the coordinator and subagents.
 
 5. Consolidate feedback. Write each full response under
    `<context_dir>/plan-review-responses/` and write one line per reviewer to
-   `reviewer-verdicts.md`: agent name, APPROVED/BLOCKED, and a one-line reason. If any agent
-   returns BLOCKED, present the reason and STOP for human input. Incorporate all non-blocking
-   feedback into the implementation approach.
+   `reviewer-verdicts.md`: agent name, APPROVED/BLOCKED, and a one-line reason. Incorporate all
+   non-blocking feedback into the implementation approach.
+
+   Classify every BLOCKED finding before deciding whether to interrupt the human:
+
+   - **Correctable technical finding** — the accepted mandate stays intact and the finding can be
+     resolved by tightening implementation detail, tests, compatibility, rollback, observability,
+     or scope within that mandate. Revise `plan.md`, record the finding and response, then rerun the
+     blocking reviewer plus any reviewer whose domain the revision changed. Continue until the
+     revised plan is approved.
+   - **Human-decision blocker** — resolution changes requirements, user-visible scope, architecture,
+     risk acceptance, rollout policy, or another decision represented in the approved plan; two
+     reviewers require incompatible outcomes; or evidence is insufficient to choose safely. Present
+     the alternatives and exact decision required, then STOP.
+   - **Safety, permission, or external blocker** — the Safety Veto applies, an unauthorized or
+     destructive action is required, a reviewer cannot run, or an external prerequisite prevents a
+     valid review. Present the evidence and STOP.
+
+   Keep corrections bounded to the blocking evidence. If the same finding remains after two
+   materially distinct plan revisions, STOP with both attempted approaches instead of spending more
+   context on an unproductive loop. Do not ask the human to approve ordinary technical corrections
+   that preserve the accepted mandate, and do not silently reinterpret the mandate to avoid an
+   approval gate.
+
+   Complete when every reviewer is APPROVED or execution has stopped with one of the named blockers.
 
 5b. Shed plan-review context before step 6. Retain only the approved plan with incorporated
-    feedback, the one-line verdict list, full reasons for BLOCKED items, and the detection
-    flags from step 1. Use the staged response files if full reviewer text is needed later.
+    feedback, the final one-line verdict list, unresolved blocker evidence when present, and the
+    detection flags from step 1. Use the staged response files if full reviewer text is needed later.
 
 6. Before editing, verify the current branch complies with `AGENTS.md`. Never implement
    directly on a protected or integration branch. Create the required task branch from the
