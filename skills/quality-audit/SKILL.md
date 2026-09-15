@@ -34,20 +34,38 @@ Complete when the cost, fallback, and non-applicability branches are resolved.
 
 Complete when the repository boundary, standards, auditor definition, non-empty scan manifest, and output path are fixed.
 
-## 2. Chunk and audit every file
+## 2. Chunk, validate, audit, and reconcile
 
-Group related files together, targeting about 30 KB or 15 files per chunk. Give an oversized file its own chunk. Run at most eight chunks concurrently per wave.
+### 2a. Build and validate chunks
 
-Dispatch one `quality-auditor` pass per chunk using the host's native subagent mechanism. Give each pass:
+Group related files together with a **hard cap of 15 files and 30 KB of source per chunk**. An oversized single file gets its own chunk. Before dispatching any chunk, verify every chunk meets both limits; split any that exceed either limit. Do not proceed to dispatch until every chunk passes.
+
+Record the chunk table: one row per chunk with chunk ID, file count, total KB, and the exact file list.
+
+### 2b. Dispatch auditors
+
+Run at most eight chunks concurrently per wave. Dispatch one `quality-auditor` pass per chunk using the host's native subagent mechanism. Give each pass:
 
 - the chunk ID and exact file manifest;
 - the files' contents, not paths alone;
 - the loaded code-quality standard;
-- the requirement to inspect all four dimensions for every assigned file and return its per-dimension zero counts.
+- the requirement to inspect all four dimensions for every assigned file, return per-dimension zero counts, and echo back the complete list of files actually inspected.
 
-If no parallel mechanism exists, run the same passes sequentially and disclose that fact. After each wave, record one completion row per chunk: manifest, pass status, finding count, and all four dimension totals.
+If no parallel mechanism exists, run the same passes sequentially and disclose that fact.
 
-Complete when every manifest file belongs to exactly one completed chunk and every chunk reports all four dimensions.
+### 2c. Post-wave reconciliation
+
+After each wave, for every returned chunk:
+
+1. Extract the auditor's echoed file list from its response.
+2. Diff the echoed list against the dispatched manifest. If any dispatched file is missing from the echo, the chunk is **rejected** — the auditor sampled instead of auditing.
+3. Verify the auditor reported all four dimension summaries.
+
+For any rejected chunk: split it into smaller sub-chunks (halve the file count), re-dispatch, and repeat reconciliation. Do not proceed to Step 3 with unreconciled chunks.
+
+Record one completion row per accepted chunk: manifest, pass status, finding count, all four dimension totals, and the reconciliation result (accepted / rejected-and-requeued).
+
+Complete when every manifest file belongs to exactly one accepted chunk, every chunk's echoed file list matches its dispatched manifest, and every chunk reports all four dimensions.
 
 ## 3. Build the authoritative finding ledger
 
@@ -107,7 +125,7 @@ Write the output file in this exact top-level order:
 1. `# Code Quality Remediation Plan`
 2. `## Audit metadata` — target, revision, date, standards, files scanned, chunks, and declared finding total.
 3. `## Executive summary`
-4. `## Scan coverage` — full file manifest or an unambiguous generated manifest section, plus chunk completion table and per-dimension counts.
+4. `## Scan coverage` — full file manifest or an unambiguous generated manifest section, chunk completion table (including pre-dispatch size validation and post-wave reconciliation results), and per-dimension counts.
 5. `## Finding ledger` — one explicit row per full stable ID with all Step 3 fields.
 6. `## Programme roadmap` — one row per workstream with phase, findings, prerequisites, parallel track, and closure gate.
 7. `## Dependency and relationship register` — duplicate aliases, overlaps, dependencies, conflicts, and dispositions.
@@ -133,6 +151,7 @@ Before claiming `READY`, check the written file rather than working memory:
 - duplicate aliases remain traceable without double-counting implementation scope;
 - phase totals and workstream totals equal the declared finding total;
 - scan coverage proves every target file and every audit dimension was processed;
+- every chunk in the completion table shows a matched dispatched-vs-echoed file list (no sampling);
 - no section says `see above`, uses an ID range, or substitutes a summary for row-level accounting.
 
 Repair the artifact and rerun the gate until it passes. If a source limitation prevents repair, mark `NOT READY` and list the exact missing IDs or fields.

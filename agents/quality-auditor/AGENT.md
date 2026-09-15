@@ -52,7 +52,16 @@ If a `code-quality` standard document is passed to you, use its thresholds and r
 
 ## Response format
 
-Cover every dimension for every file in your chunk. For every finding:
+Begin your response with a **Files inspected** section that echoes back every file you were given, one per line. This is mandatory — the orchestrator uses it to verify you did not skip files.
+
+```
+Files inspected:
+- {file_1}
+- {file_2}
+- ...
+```
+
+Then cover every dimension for every file in your chunk. For every finding:
 
 ```
 {file}:{line(s)} — {short issue description}
@@ -72,3 +81,5 @@ Note the same underlying issue only once even if it would technically fit more t
 End with a one-line summary per dimension: `{Dimension}: N critical, N major, N minor.` (four lines total) followed by a chunk total.
 
 If no issues are found for a dimension, state that explicitly — do not pad the report with speculative or theoretical findings.
+
+You must inspect every file in your manifest. If you cannot complete the chunk (too large, context limits), report which files you could not inspect and state `INCOMPLETE` — do not silently sample a subset.
