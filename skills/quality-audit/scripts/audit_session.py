@@ -239,8 +239,10 @@ def command_record(args):
     echoed = inspected_files(text)
     summaries = dimension_summaries(text)
     reasons = []
-    if "INCOMPLETE" in text:
-        reasons.append("auditor reported INCOMPLETE")
+    if re.search(r"(?im)^\s*INCOMPLETE\s*:\s*true\s*$", text):
+        reasons.append("auditor reported INCOMPLETE: true")
+    if not re.search(r"(?im)^\s*INCOMPLETE\s*:\s*false\s*$", text):
+        reasons.append("missing INCOMPLETE: false completion marker")
     if echoed != expected:
         reasons.append(f"manifest mismatch: expected {expected}, echoed {echoed}")
     missing_dimensions = [dimension for dimension in DIMENSIONS if dimension not in summaries]

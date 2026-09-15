@@ -62,8 +62,7 @@ class AuditSessionTests(unittest.TestCase):
     def result_file(self, name, paths, incomplete=False):
         result = self.root / name
         lines = ["Files inspected:", *(f"- {path}" for path in paths), "", SUMMARIES]
-        if incomplete:
-            lines.append("INCOMPLETE")
+        lines.append("INCOMPLETE: true" if incomplete else "INCOMPLETE: false")
         result.write_text("\n".join(lines), encoding="utf-8")
         return result
 

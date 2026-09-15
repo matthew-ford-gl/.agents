@@ -52,13 +52,13 @@ Run `python <skill-dir>/scripts/audit_session.py next-wave --session <session> -
 - the session and chunk ID plus exact file manifest;
 - the files' contents, not paths alone;
 - the loaded code-quality standard;
-- the requirement to inspect all four dimensions for every assigned file, return per-dimension zero counts, and echo back the complete list of files actually inspected.
+- the requirement to inspect all four dimensions for every assigned file, return per-dimension zero counts, echo back the complete list of files actually inspected, and include `INCOMPLETE: false` when every file is fully audited or `INCOMPLETE: true` when a file must be skipped.
 
 Write each complete return to a temporary file, then record it before starting another wave. If no parallel mechanism exists, run the passes sequentially. Absence of parallelism changes throughput, not audit completeness.
 
 ### 2c. Post-wave reconciliation
 
-For every returned chunk, run `python <skill-dir>/scripts/audit_session.py record --session <session> --chunk <chunk-id> --result <return-file>`. The harness checks the exact ordered file echo, all four dimension summaries, and `INCOMPLETE`; it stores accepted evidence under `results/`, stores rejected evidence under `retries/`, and halves rejected multi-file chunks into new pending child chunks.
+For every returned chunk, run `python <skill-dir>/scripts/audit_session.py record --session <session> --chunk <chunk-id> --result <return-file>`. The harness checks the exact ordered file echo, all four dimension summaries, and an explicit `INCOMPLETE: false` or `INCOMPLETE: true` marker; it stores accepted evidence under `results/`, stores rejected evidence under `retries/`, and halves rejected multi-file chunks into new pending child chunks.
 
 After recording the wave, run `python <skill-dir>/scripts/audit_session.py status --session <session>`. Continue requesting and dispatching waves while pending chunks remain. A rejected single-file chunk becomes a `blocked` session because it cannot be split further; report that concrete worker failure rather than calling the incomplete audit a remediation plan.
 
