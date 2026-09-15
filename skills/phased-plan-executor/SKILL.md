@@ -1,90 +1,158 @@
 ---
 name: phased-plan-executor
-description: "Executes one phase of an executor-ready phased remediation plan, including plans written directly by quality-audit, by dispatching one parallel, worktree-isolated subagent per workstream, reconciling naming and file-overlap conflicts, then stopping for human approval before any merge, shared-branch push, or new PR. Use when asked to execute a numbered phase, work a phase of a quality-audit plan, kick off a workstream batch, or run the next remediation phase. Not for: producing a plan, running multiple phases in one invocation, or merging/pushing without review."
-argument-hint: "<plan file path> <phase number>"
-model: opus  # cross-agent conflict reconciliation (Step 4) needs stronger judgment than routine dispatch
+description: "Executes an executor-ready phased remediation plan in one of two controlled modes: one worktree-isolated phase that stops before integration, or an approved multi-phase programme that uses disposable workstream contexts and opens bounded PRs. Use when asked to execute a numbered quality-audit phase, run the next remediation phase, or work an entire READY quality-audit report across multiple PRs. Not for: producing a plan, merging PRs, or general feature delivery."
+argument-hint: "<plan file path> <phase number | all>"
+model: opus # cross-workstream reconciliation and programme dependency decisions need strong judgment
 ---
-
 # Phased Plan Executor
 
-Input: `$ARGUMENTS` — a phased plan file path and a phase number.
+Input: `$ARGUMENTS` — one executor-ready plan and either a phase number or `all`.
 
-Execute exactly one phase of an already-written plan by fanning out one subagent per workstream in that phase.
+## Modes and authority
 
-**Standing boundary:** this skill never merges, never pushes to main or any shared branch, and never opens a new PR — those steps always stop for a human, regardless of how small the change looks. Every later reference to "the standing boundary" in this file means exactly this.
+- **PHASE mode** (`<phase number>`): execute exactly one phase in isolated worktrees, reconcile it,
+  then stop. Never merge, push to a shared branch, or open a PR.
+- **PROGRAMME mode** (`all`): present one programme approval gate, then autonomously implement
+  dependency-safe workstream batches, normally push task branches, and open bounded PRs. Never merge,
+  force-push, perform destructive actions, or change the accepted programme scope.
+
+Do not infer PROGRAMME mode from vague wording; it grants broader side effects and requires explicit
+`all` plus approval.
 
 ## Complexity contract
 
-- If no phase number is given, or more than one phase is requested, stop and ask. Never run multiple phases in one invocation — later phases reuse names and conventions minted by earlier ones, and running them together defeats the sequencing the plan was built for.
-- Proceed only when the plan's `Executor readiness` section says `READY`. If it is absent or says `NOT READY`, stop with the missing or failed contract fields rather than invoking another planner or guessing structure.
-- If the plan file has no recognizable phase/workstream structure (no roadmap, coverage matrix, phase-tagged workstreams, or per-workstream findings/remediation-shape/code-boundary/acceptance-criteria fields), stop and report rather than guessing structure.
-- If the requested phase has zero workstreams, report that and stop — likely a typo in the phase number.
+- Proceed only when `Executor readiness` says `READY` and the ledger, roadmap, workstream sections,
+  coverage matrix, and accounting reconcile. Stop with exact missing or duplicate IDs otherwise.
+- Use one fresh worker context per workstream. Keep the coordinator context to programme state and
+  compact results; never accumulate source, complete diffs, full logs, or reviewer transcripts.
+- In PROGRAMME mode, default to at most four concurrent workers. Serialize overlapping files,
+  components, tests, migrations, deployment units, and hard dependencies.
+- Open one PR per independently reviewable workstream. Combine workstreams only when they share one
+  remediation mechanism, code boundary, validation suite, and rollback unit.
+- Stop a workstream when the same failure fingerprint survives two materially distinct fixes. Other
+  independent work may continue when the plan permits it.
 
-## 1. Read the plan and locate the phase
+Complete when the mode, authority, cost bounds, and fallback behaviour are explicit.
 
-1. Read the full plan file. Don't skim — executor readiness, accounting, roadmap, coverage matrix, and workstream sections must agree.
-2. Confirm the readiness gate says `READY`, then reconcile its declared finding total with the explicit finding-ledger and coverage-matrix row counts. Stop on a mismatch and name the missing or duplicate IDs.
-3. From the roadmap and coverage matrix, list every workstream tagged with the requested phase and every finding ID under each.
-4. Reconcile every selected workstream across the roadmap, coverage matrix, and full workstream section: phase, complete finding IDs, acceptance-criterion references, code boundary, and prerequisites must agree. Call out any mismatch rather than silently trusting one source.
+## 1. Read and validate the plan
 
-Complete when the plan passes its readiness/count check and the phase's full workstream list is cross-checked across all three plan views.
+1. Read the full plan, including readiness, accounting, roadmap, relationship register, coverage
+   matrix, and every selected workstream section.
+2. Reconcile the declared finding total with explicit ledger and coverage rows. Confirm every finding
+   belongs to exactly one primary workstream and every workstream has a phase, remediation shape,
+   code boundary, acceptance criteria, tests, prerequisites, and closure gate.
+3. Verify prerequisites against actual repository and PR state, not plan labels alone.
+4. Load naming-convention notes from completed earlier phases. Workers must reuse existing names for
+   the same concept.
 
-## 2. Check the gate before starting
+In PHASE mode, select every workstream in the requested phase. In PROGRAMME mode, retain the complete
+dependency graph but load detailed workstream content only when selecting its batch.
 
-1. From the plan's dependency/relationship register and roadmap, list this phase's prerequisites (which earlier phases, workstreams, or PRs must already be closed) and its own closure gate.
-2. Check each prerequisite against actual repository or PR state — merged PRs, existing branches, files on disk — not against the plan's phase labels alone. A phase can be "done" on paper and still unmerged in practice.
-3. If a prerequisite is unmet, stop and report exactly what's missing rather than starting the phase anyway. Do not downgrade a hard prerequisite to a soft warning just to keep moving.
-4. If an earlier phase left behind a naming-conventions note (metric, event, or span names it minted, written at the end of its own Step 4 below), read it now. Every subagent dispatched in this phase must reuse those names for the same concept rather than mint new ones — this is the single most common way phases collide with each other.
+Complete when plan accounting agrees and selected work is explicit, or the run has stopped with a
+named contract failure.
 
-Complete when the gate is confirmed open, or the run has stopped with a named, specific blocker.
+## 2. Establish state and approval
 
-## 3. Brief and dispatch one subagent per workstream
+For PHASE mode, continue directly to Step 3 under its standing boundary.
 
-For each workstream in the phase, in one message, dispatch a subagent with `isolation: "worktree"`. Consult `subagent-dispatch` for dispatch mechanics — the four-part contract (objective, output, tools, boundaries) applies here as it does to any delegation.
+For PROGRAMME mode:
 
-**Sizing.** One workstream is not always one subagent. If a single workstream's findings span multiple independent components with no shared files between them (separate deployment units, separate apps), split that workstream into one subagent per component group instead of overloading one agent with all of it — fully independent, non-overlapping fan-outs tolerate up to about 10 agents. Keep it as one subagent when the workstream is small or its findings already share files. Either way, every subagent in the batch stays independent — none should need another's output before it can finish.
+1. Resolve `context_root` in order: `CONTEXT_STORAGE_PATH`; repository
+   `.devin/agent-context.json`; `~/.config/devin/agent-context.json`; writable host temporary
+   directory; ignored repository `.tmp`. Resolve and probe the selected path.
+2. Create or load `<context_root>/<safe-repo-name>/quality-remediation-<plan-id>.json`. Store only
+   plan revision, workstream/finding status, prerequisites, PRs, commits, gate verdicts, conventions,
+   and compact blockers. Store no source, diffs, logs, credentials, or reviewer transcripts.
+3. Present phases, dependency order, PR grouping, maximum concurrency, forced serialization, local
+   validation/review gates, authorized side effects, and escalation conditions. STOP for approval.
 
-Each brief must carry, verbatim from the plan's own workstream entry:
+Approval covers every in-scope workstream and later phase whose prerequisites become satisfied. Ask
+again only when requirements, architecture, user-visible behaviour, risk acceptance, rollout policy,
+or PR grouping must change; when safety, permissions, credentials, or destructive action are
+involved; or when the repeated-fingerprint rule is exhausted.
 
-- the workstream's full finding entries, remediation shape, code boundary, acceptance criteria, tests, and closure gate;
-- any naming conventions carried over from Step 2.4;
-- the per-finding branch rule below;
-- the standing boundary (stated at the top of this file).
+Complete when PHASE mode is bounded, or PROGRAMME mode has an accepted programme and durable compact
+checkpoint.
 
-**Per-finding branch rule**, inside every subagent's brief:
+## 3. Select one dependency-safe batch
 
-- Before touching anything, check `git rev-parse --is-shallow-repository`; if true, run
-  `git fetch --unshallow origin <branch>` first. A shallow clone can make a stale base look
-  like a genuine conflict or revert hazard, producing a false-positive finding.
-- If a finding carries a linked PR: verify that PR's actual source branch via the repository host's PR-query command before touching anything — never assume the currently checked-out branch matches the PR. Check out that branch, patch in place, and push only to that PR's own branch.
-- If a finding has no linked PR: branch fresh off main, implement, test against the finding's acceptance criteria, and commit. Do not push.
+PHASE mode selects all mutually independent workstreams in its requested phase and stops if a hard
+prerequisite is unmet. PROGRAMME mode rebuilds state from the plan, checkpoint, Git, and PR host on
+each iteration, then selects pending workstreams whose prerequisites are satisfied.
 
-Each subagent's return must include: per-finding status (closed / patched / residual), any file or component it touched that another workstream in this same batch might also touch, and any new metric/event/span name it introduced. A single-workstream subagent cannot see its siblings, so it can only flag a possible overlap — it cannot resolve one. Resolution happens in Step 4.
+Exclude workstreams that overlap files, components, tests, migrations, or deployment units with
+another selected item. In PROGRAMME mode cap the batch at four workers. If no item is selectable,
+report completion or the exact open-PR prerequisite, dependency cycle, or blocker. Never wait or poll
+remote state in the current context.
 
-Complete when every workstream in the phase has a dispatched subagent, and none of them have been asked to merge, push to main, or open a PR.
+Complete when one bounded independent batch is selected or the programme has a terminal state.
 
-## 4. Wait, then reconcile
+## 4. Dispatch disposable workstream workers
 
-1. Wait for every subagent in the batch to return before doing anything else.
-2. Build one reconciliation table: finding → status → workstream → any naming or file overlap flagged by more than one subagent.
-3. Resolve naming collisions yourself. This is the one step no individual subagent could do, since each only sees its own workstream — pick one name per concept, preferring the earlier-phase convention from Step 2.4 when one exists.
-4. Propose a merge order for the batch that respects the plan's own dependency register for this phase.
-5. If this phase minted any new naming conventions, write them down as a short conventions note — append to the plan file or a sibling note next to it. The next phase's Step 2.4 depends on this note existing.
+Dispatch one fresh, worktree-isolated worker per selected workstream using the host-native mechanism
+and `subagent-dispatch` guidance. Give each worker only:
 
-Complete when every finding in the phase has one status, every cross-agent conflict has one resolution, and a merge order is proposed.
+- complete finding rows, remediation shape, code boundary, acceptance criteria, tests, closure gate,
+  and prerequisite evidence for its workstream;
+- earlier naming conventions;
+- absolute paths to applicable repository instructions, standards, and source files;
+- a private temporary context directory;
+- the authority boundary for the selected mode.
 
-## 5. Report and stop
+Require every worker to:
 
-Present, in this order: phase number and workstreams covered; per-finding status table; naming decisions made; file-overlap conflicts and their resolutions; proposed merge order; conventions carried forward for the next phase.
+1. Verify findings against current reachable code; return stale or false findings with evidence.
+2. Implement one bounded vertical correction at a time and run targeted tests.
+3. Derive the complete pre-push suite from repository instructions and live CI definitions.
+4. Run that suite on the final tree. Retain only failure-bearing excerpts capped at 400 lines and
+   40 KiB per check.
+5. Run `qa-gatekeeper` in implementation mode and the applicable Orchestrator diff-stage reviewers.
+   Pass artifact paths rather than inline contents.
+6. Correct actionable failures and MUST-FIX findings in the smallest implicated scope, rerun affected
+   checks/reviewers, then finish with one full final suite.
+7. Stop only for a human-decision, safety, permission, or external blocker, or when one fingerprint
+   survives two materially distinct fixes.
+8. Commit the green result. In PROGRAMME mode normally push and open its approved PR; in PHASE mode
+   do not push or open a PR.
 
-Then stop. The standing boundary from the top of this file applies here without exception — not even for a one-line change.
+Each worker returns only finding status, changed paths, commit, optional PR URL, gate verdicts, new
+conventions, blocker fingerprint, and temporary artifact paths. Never reuse its context for another
+workstream.
 
-Complete when the human has the full batch summary and nothing has been merged, pushed to a shared branch, or opened as a new PR without their approval.
+Complete when every selected worker returns one compact result within its mode's authority.
+
+## 5. Reconcile and persist
+
+1. Build a finding-to-status table and resolve cross-worker naming or file collisions. Prefer an
+   earlier convention and record one merge order where integration is later required.
+2. In PHASE mode, append any new conventions beside the plan for the next phase.
+3. In PROGRAMME mode, update the compact checkpoint with `PR OPEN`, `CLOSED AS STALE`, or `BLOCKED`,
+   direct evidence, commit, PR, gate verdicts, and conventions.
+4. Shed worker source, diffs, logs, and reviewer transcripts from active context. Retain diagnostics
+   by path only.
+5. Never poll or merge open PRs. Continue to Step 3 only while another batch is independent of them;
+   otherwise stop with exact merge prerequisites for the next batch.
+
+Complete when every selected finding has a disposition, conventions and dependencies are durable,
+and a fresh invocation can resume without conversation history.
+
+## 6. Report and stop
+
+In PHASE mode report phase/workstreams, per-finding status, naming decisions, overlap resolutions,
+proposed merge order, and conventions for the next phase. Confirm nothing was pushed or opened.
+
+In PROGRAMME mode report plan revision; completed, open, pending, stale, and blocked workstreams;
+finding coverage; PR URLs and gate verdicts; conventions; next unblocked batch or merge prerequisite;
+and checkpoint path. Never report completion while a finding lacks an explicit disposition.
+
+Complete when the human can review each result independently and no merge or unauthorized side
+effect has occurred.
 
 ## Integration with sibling skills
 
 | Counterpart | Hand-off |
 |---|---|
-| `quality-audit` | Produces a `READY`, executor-compatible code-quality remediation plan without an intermediate planning skill. |
-| `subagent-dispatch` | Dispatch mechanics for the per-workstream subagents in Step 3. |
-| `resolving-merge-conflicts` | If the proposed merge order in Step 4 surfaces a real conflict once merges are attempted, use this after human approval. |
+| `quality-audit` | Produces the `READY` plan consumed in either mode. |
+| `subagent-dispatch` | Supplies host-specific isolated dispatch mechanics. |
+| `resolving-merge-conflicts` | Resolves conflicts after separately approved integration begins. |
+| `land-pr` | Handles evidenced remote-only CI or review feedback for an already-open PR. |

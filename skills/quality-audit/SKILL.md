@@ -143,12 +143,13 @@ Complete when every check is recorded as passing in `## Executor readiness`, or 
 
 Tell the human the output path, finding/workstream/phase counts, readiness status, and any limitations. For zero findings, still write metadata, scan coverage, empty ledger/roadmap/matrix, reconciled zero accounting, and `READY — no execution required`. For one finding, create one workstream and one executable phase rather than using a separate format.
 
-Complete when the human can pass the written file and a phase number directly to `phased-plan-executor` without another planning step.
+Complete when the human can pass the written file and either a phase number or `all` directly to
+`phased-plan-executor` without another planning step.
 
 ## Integration with sibling skills
 
 | Counterpart | Hand-off |
 |---|---|
-| `phased-plan-executor` | Executes one numbered phase from this skill's `READY` output file. |
+| `phased-plan-executor` | Executes one numbered phase or an approved multi-PR programme from this skill's `READY` output file. |
 | `investigate-repo` | Validates uncertain reachability or repository claims before a gated phase runs. |
 | `subagent-dispatch` | Supplies host-specific dispatch mechanics for chunk auditors. |

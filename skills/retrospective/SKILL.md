@@ -43,8 +43,12 @@ Also look for:
 - `*-critic.md` or `*-feasibility.md` from `/review-plans`
 - Any `VERIFY-FIX-VERDICT.md` from `/verify-fix`
 - Test results and build output if still in context
+- First-push CI failures, later fix commits, and unresolved or resolved PR review threads
 
-If `$ARGUMENTS` includes a PR URL, fetch the PR description and comments.
+If `$ARGUMENTS` includes a PR URL, fetch the PR description, changed-file list, check conclusions,
+and review-thread histories. Bound CI evidence to the failing step plus at most 100 surrounding lines;
+do not load successful logs or whole-run output. Classify comments from humans and AI reviewers by
+the defect they identify rather than reviewer identity.
 
 ---
 
@@ -58,8 +62,15 @@ For each artifact found, extract:
 4. **What a reviewer (human or agent) caught** — what did BLOCKED feedback prevent that would have shipped broken?
 5. **What the root cause turned out to be** — for bugs, was the initial hypothesis wrong? What evidence changed the investigation?
 6. **What would have helped** — what did you wish you had known at the start?
+7. **What escaped the pre-PR gates** — for each first-push CI failure or actionable review comment,
+   classify it as correctness, missing test, repository convention, CI-parity gap, maintainability,
+   environment-only, low-value style, or false positive. Record whether an existing local gate should
+   have caught it and the smallest authoritative source that could prevent recurrence.
 
-Discard anything that was routine, went as expected, and would not be useful to a future engineer encountering the same codebase.
+Discard anything that was routine, went as expected, and would not be useful to a future engineer
+encountering the same codebase. Do not turn one reviewer preference into a standing rule; require
+either a repository standard, a correctness argument, or the same evidenced category on at least
+two PRs.
 
 ---
 
@@ -120,6 +131,14 @@ After routing learnings, check if any finding suggests an improvement to the wor
 - Did the tests miss a case that caused a production issue? → Suggest adding that test pattern to `qa-gatekeeper`'s standards
 - Did a persona debate surface a concern that turned out to be the critical insight? → Note it (no file update needed, just acknowledge)
 - Did the plan-task debate miss something obvious? → Suggest whether a new persona or reviewer would have caught it
+- Did remote CI expose a command, configuration, service, or environment difference absent from the
+  local gate? → Suggest the smallest CI-parity improvement and identify any prerequisite that cannot
+  run locally.
+- Did an actionable PR-review category recur on at least two PRs? → Route it to one enforcement
+  point: deterministic lint/test/CI when possible, otherwise the narrowest reviewer or project
+  standard. Do not duplicate it across prompts.
+- Was a comment low-value style or a false positive? → Record the category count, but do not encode
+  it as a new delivery gate.
 
 Present these as suggestions, not automatic updates — the human decides whether to act on them.
 
