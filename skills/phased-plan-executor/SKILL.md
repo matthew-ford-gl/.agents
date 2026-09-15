@@ -1,6 +1,6 @@
 ---
 name: phased-plan-executor
-description: "Executes one phase of an already-written phased remediation plan (such as one produced by report-remediation-planner) by dispatching one parallel, worktree-isolated subagent per workstream in that phase, reconciling naming and file-overlap conflicts across their reports, then stopping for human approval before any merge, push to a shared branch, or new PR. Use when asked to work a specific phase of a phased plan doc, kick off a workstream batch, run the next phase of a remediation programme, or execute (not plan) a numbered phase. Not for: producing the plan itself (use report-remediation-planner), running more than one phase in a single invocation, or merging/pushing without review."
+description: "Executes one phase of an executor-ready phased remediation plan, including plans written directly by quality-audit, by dispatching one parallel, worktree-isolated subagent per workstream, reconciling naming and file-overlap conflicts, then stopping for human approval before any merge, shared-branch push, or new PR. Use when asked to execute a numbered phase, work a phase of a quality-audit plan, kick off a workstream batch, or run the next remediation phase. Not for: producing a plan, running multiple phases in one invocation, or merging/pushing without review."
 argument-hint: "<plan file path> <phase number>"
 model: opus  # cross-agent conflict reconciliation (Step 4) needs stronger judgment than routine dispatch
 ---
@@ -16,16 +16,18 @@ Execute exactly one phase of an already-written plan by fanning out one subagent
 ## Complexity contract
 
 - If no phase number is given, or more than one phase is requested, stop and ask. Never run multiple phases in one invocation — later phases reuse names and conventions minted by earlier ones, and running them together defeats the sequencing the plan was built for.
-- If the plan file has no recognizable phase/workstream structure (no phase-tagged workstreams, no per-workstream findings/remediation-shape/acceptance-criteria fields), stop and report rather than guessing structure.
+- Proceed only when the plan's `Executor readiness` section says `READY`. If it is absent or says `NOT READY`, stop with the missing or failed contract fields rather than invoking another planner or guessing structure.
+- If the plan file has no recognizable phase/workstream structure (no roadmap, coverage matrix, phase-tagged workstreams, or per-workstream findings/remediation-shape/code-boundary/acceptance-criteria fields), stop and report rather than guessing structure.
 - If the requested phase has zero workstreams, report that and stop — likely a typo in the phase number.
 
 ## 1. Read the plan and locate the phase
 
-1. Read the full plan file. Don't skim — the roadmap, coverage matrix, and workstream sections must agree with each other.
-2. From the roadmap and coverage matrix, list every workstream tagged with the requested phase, and every finding ID under each.
-3. Reconcile: every workstream claimed for this phase should appear in both the roadmap and the coverage matrix with the same phase number. Call out any mismatch rather than silently trusting one source over the other.
+1. Read the full plan file. Don't skim — executor readiness, accounting, roadmap, coverage matrix, and workstream sections must agree.
+2. Confirm the readiness gate says `READY`, then reconcile its declared finding total with the explicit finding-ledger and coverage-matrix row counts. Stop on a mismatch and name the missing or duplicate IDs.
+3. From the roadmap and coverage matrix, list every workstream tagged with the requested phase and every finding ID under each.
+4. Reconcile every selected workstream across the roadmap, coverage matrix, and full workstream section: phase, complete finding IDs, acceptance-criterion references, code boundary, and prerequisites must agree. Call out any mismatch rather than silently trusting one source.
 
-Complete when the phase's full workstream list is fixed and cross-checked against two independent parts of the plan.
+Complete when the plan passes its readiness/count check and the phase's full workstream list is cross-checked across all three plan views.
 
 ## 2. Check the gate before starting
 
@@ -44,7 +46,7 @@ For each workstream in the phase, in one message, dispatch a subagent with `isol
 
 Each brief must carry, verbatim from the plan's own workstream entry:
 
-- the workstream's finding IDs, remediation shape, code boundary, and acceptance criteria;
+- the workstream's full finding entries, remediation shape, code boundary, acceptance criteria, tests, and closure gate;
 - any naming conventions carried over from Step 2.4;
 - the per-finding branch rule below;
 - the standing boundary (stated at the top of this file).
@@ -83,6 +85,6 @@ Complete when the human has the full batch summary and nothing has been merged, 
 
 | Counterpart | Hand-off |
 |---|---|
-| `report-remediation-planner` | Produces the phased plan this skill executes. Run it first if no plan exists yet. |
+| `quality-audit` | Produces a `READY`, executor-compatible code-quality remediation plan without an intermediate planning skill. |
 | `subagent-dispatch` | Dispatch mechanics for the per-workstream subagents in Step 3. |
 | `resolving-merge-conflicts` | If the proposed merge order in Step 4 surfaces a real conflict once merges are attempted, use this after human approval. |

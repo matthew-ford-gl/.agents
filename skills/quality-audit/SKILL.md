@@ -1,101 +1,154 @@
 ---
 name: quality-audit
-description: "Runs a parallel code quality audit and turns its findings into a prioritised, phased remediation plan with coverage accounting. Use when asked to audit code quality, review for SOLID/complexity/smells, run a quality pass, or identify and sequence quality improvements across a path, diff, or repo. Not for: architecture-level design review (use architecture-audit), security review, PR requirements compliance, or implementing fixes."
-argument-hint: "[path | glob | diff | (empty = whole repo)]"
-model: sonnet  # sonnet is sufficient for mechanical per-chunk pattern-matching (SOLID/naming/complexity/smells); no need for opus-level reasoning
+description: "Runs a parallel code-quality audit and writes an executor-ready phased remediation plan with a complete finding ledger, actionable workstreams, dependency gates, and stable-ID coverage accounting. Use when asked to audit code quality, review SOLID/complexity/smells, run a quality pass, or identify and sequence quality improvements across a path, diff, or repository. Not for: architecture design review, security review, PR requirements compliance, or implementing fixes."
+argument-hint: "[path | glob | diff | (empty = whole repo)] [output file]"
+model: opus
 ---
 
-You are running a code quality audit. Task: `$ARGUMENTS`
+# Quality Audit
 
-## What This Command Does
+Task: `$ARGUMENTS`
 
-The target file set is split into chunks, and the same `quality-auditor` persona runs on each chunk in parallel — each pass checks all four dimensions (SOLID, Naming & Clean Code, Complexity, Code Smells & Duplication) but only for the files in its chunk. Findings are consolidated into one severity-ranked report, then handed to `report-remediation-planner` to produce a prioritised, phased programme with complete finding coverage. Read-only: no production files are modified.
+Audit a target in parallel, consolidate every finding once, and write one self-contained plan that `phased-plan-executor` can execute directly. Read-only: do not modify production code, implement fixes, or open tickets.
 
----
+## Complexity contract
 
-## Step 1: Resolve the Agent
+- Stop if the target resolves to no files or the `quality-auditor` agent cannot be resolved.
+- For a small target, one auditor pass is the fast path. Otherwise chunk by coherent module and run up to eight passes per wave.
+- Keep the complete finding ledger in the main workflow. Subagents may inspect chunks, but no subagent may own final extraction, IDs, coverage, or plan synthesis.
+- If output would be too large for the console, write the complete artifact to a file rather than abbreviating findings. Never replace rows with ranges such as `QA-001–QA-163`.
+- If planning cannot be completed, preserve the full audit and report the exact failed gate. Do not emit a partial plan as executor-ready.
 
-Resolve `quality-auditor`'s file by checking, in order, and using the first that exists:
-`.devin/agents/quality-auditor/AGENT.md` → `.claude/agents/quality-auditor.md` →
-`~/.agents/agents/quality-auditor/AGENT.md` → `~/.claude/agents/quality-auditor.md`. Read it.
+Complete when the cost, fallback, and non-applicability branches are resolved.
 
-If none exist, stop and tell the human the `quality-auditor` agent is missing.
+## 1. Resolve instructions, agent, and target
 
-## Step 2: Load Standards
+1. Read repository instructions and the code-quality standard from `.context/index.md` or `.context/standards/code-quality.md` when present.
+2. Resolve `quality-auditor` using the first existing path: `.devin/agents/quality-auditor/AGENT.md`, `.claude/agents/quality-auditor.md`, `~/.agents/agents/quality-auditor/AGENT.md`, `~/.claude/agents/quality-auditor.md`. Read it; stop with the searched paths if none exists.
+3. Parse the target:
+   - `diff`: use files changed from the current branch's merge base; fall back to staged files when appropriate.
+   - path or glob: resolve it and expand directories while respecting `.gitignore`.
+   - empty: prefer `git ls-files`; otherwise glob from the repository root.
+4. Exclude generated, vendored, binary, build-output, lock, and VCS paths. Record every included file in a scan manifest.
+5. Resolve the output path. Use the requested path or default to `CODE-QUALITY-REMEDIATION.md` in the repository root.
 
-If `.context/index.md` or `.context/standards/code-quality.md` exists in the repo root, read the code-quality standard now. Pass its content (not the path) to every auditor pass in Step 4 so severity is calibrated against the project's actual thresholds rather than the auditor's defaults.
+Complete when the repository boundary, standards, auditor definition, non-empty scan manifest, and output path are fixed.
 
-## Step 3: Resolve the Target File Set and Chunk It
+## 2. Chunk and audit every file
 
-Parse `$ARGUMENTS`:
+Group related files together, targeting about 30 KB or 15 files per chunk. Give an oversized file its own chunk. Run at most eight chunks concurrently per wave.
 
-- **`diff`** — run `git diff --name-only` against the merge base of the current branch (fall back to staged changes via `git diff --name-only --cached` if the working tree is clean). Read the current contents of each changed file.
-- **A path or glob** — resolve it. If it's a directory, expand to the files inside it (respecting `.gitignore`).
-- **Empty** — audit the whole repo. Prefer `git ls-files` (respects `.gitignore` automatically) if inside a git repo; otherwise glob from the repo root. Exclude `node_modules`, `dist`, `build`, `vendor`, `.git`, lockfiles, and other generated/binary paths regardless of source.
+Dispatch one `quality-auditor` pass per chunk using the host's native subagent mechanism. Give each pass:
 
-If the resolved file set is empty, stop and tell the human — do not run the auditors on nothing.
+- the chunk ID and exact file manifest;
+- the files' contents, not paths alone;
+- the loaded code-quality standard;
+- the requirement to inspect all four dimensions for every assigned file and return its per-dimension zero counts.
 
-**Chunk the file list** — group related files together (same directory/module first) rather than splitting arbitrarily, so each auditor pass sees coherent context:
+If no parallel mechanism exists, run the same passes sequentially and disclose that fact. After each wave, record one completion row per chunk: manifest, pass status, finding count, and all four dimension totals.
 
-- Target **~30KB of source or 15 files per chunk**, whichever limit is hit first.
-- A single file larger than the per-chunk budget gets its own chunk rather than being split mid-file.
-- Cap concurrent passes at **8 chunks per wave**. If there are more than 8 chunks, run 8 at a time, waiting for each wave to complete before starting the next — do not exceed the cap just to finish in one wave.
+Complete when every manifest file belongs to exactly one completed chunk and every chunk reports all four dimensions.
 
-Read each chunk's file contents only when it is about to be dispatched, not all up front, if the target set is large enough that holding everything in memory at once defeats the purpose of chunking.
+## 3. Build the authoritative finding ledger
 
-## Step 4: Fan Out (parallel passes per chunk)
+Consolidate chunk results centrally. Merge only findings that identify the same defect and remediation scope; retain source-chunk aliases. Assign each distinct finding one stable ID in deterministic severity/path/line order: `QA-001`, `QA-002`, and so on.
 
-For each wave, launch one `quality-auditor` pass per chunk in parallel, using the spawning mechanism native to your runtime:
+Create one ledger row per stable ID with these fields:
 
-- **Devin CLI**: `run_subagent` with `profile: "quality-auditor"`, `is_background: true` for every chunk in the wave, then `read_subagent` (`block: true`) once all of that wave's passes are launched. If the profile is rejected as unrecognized, tell the human immediately and stop — every subsequent chunk would fail the same way.
-- **Claude Code**: spawn each as a `Task` tool call with `subagent_type: "quality-auditor"`.
-- **Other hosts**: use the native parallel-subagent primitive. If none exists, say explicitly that chunks are being run sequentially inline rather than presenting it as parallel passes.
+| Field | Required content |
+|---|---|
+| ID | Full `QA-*` ID; never a range or abbreviated list |
+| Title | Concise defect name |
+| Severity | Critical, Major, or Minor |
+| Dimension / rule | Source dimension and rule |
+| Location | File and line or smallest supplied range |
+| Evidence | Source-faithful description of the observed code |
+| Impact / failure mode | Why the issue matters |
+| Proposed remediation | Concrete change shape, kept separate from evidence |
+| Source chunk | Chunk ID and any merged aliases |
+| Verification state | `Audited finding`, `Probable duplicate of <ID>`, or an explicit uncertainty |
 
-Give every pass: the file contents (not paths) for its assigned chunk only, and the code-quality standard content from Step 2 (if loaded). Each pass covers all four dimensions for its chunk — there is no per-dimension instruction to vary; the only thing that differs between calls is which files are in the chunk.
+Reconcile all of these independently:
 
-## Step 5: Consolidate
+- scan manifest files = union of chunk manifests;
+- sum of chunk raw findings = distinct ledger rows + merged duplicate aliases;
+- severity totals = ledger row count;
+- dimension totals = ledger row count;
+- declared finding total = number of explicit full-ID ledger rows.
 
-Collect every chunk's report across all waves. Merge duplicates without dropping aliases, assign each distinct finding a stable ID (`QA-001`, `QA-002`, etc.), and sort by severity (Critical → Major → Minor), then by file path. Preserve each finding's location, dimension/rule, issue, proposed fix, and source chunk. Sum the per-dimension counts across chunks.
+Complete when every raw finding is represented by a ledger row or named duplicate alias and all counts reconcile.
 
-Complete when every distinct finding has one stable ID and the severity and dimension totals reconcile to the consolidated list.
+## 4. Form executor-sized workstreams
 
-## Step 6: Report
+Assign every ledger ID to exactly one primary workstream. Group by shared remediation mechanism and overlapping code boundary, not by severity alone. Split work that cannot be implemented, reviewed, or tested coherently; combine findings only when one bounded change and acceptance suite can close them together.
 
-Print to the console — do not write a report file:
+For each workstream provide:
 
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CODE QUALITY AUDIT — {target}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- stable workstream ID and title;
+- phase number;
+- complete primary finding-ID list and duplicate aliases;
+- common thread and evidence;
+- objective and concrete remediation shape;
+- exact code boundary: files/components expected to change, or `To validate` with a validation step;
+- prerequisites, dependents, conflicts, and parallel-safety notes;
+- acceptance criteria individually referenced as `AC-<workstream>-<n>`, each mapped to one or more finding IDs;
+- required tests and validation commands, using repository-supported commands only;
+- rollout, observability, rollback, unresolved questions, and assumptions where applicable;
+- closure gate that can be checked from repository or PR state.
 
-Files scanned: {n}
+Use phases only as needed: `0 Verify`, `1 Foundations`, `2 Highest-risk fixes`, `3 Sibling rollout`, `4 Remaining fixes`, `5 Closure validation`. Foundations do not outrank urgent containment. State which workstreams can run in parallel.
 
-Critical ({n}):
-  {stable ID} — {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
+Complete when every finding has one primary workstream, every workstream is independently actionable, and every finding maps to at least one acceptance criterion.
 
-Major ({n}):
-  {stable ID} — {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
+## 5. Write the executor contract
 
-Minor ({n}):
-  {stable ID} — {file}:{line} — {issue} [{dimension}/{rule}] → {fix}
+Write the output file in this exact top-level order:
 
-By dimension:  SOLID {c}/{m}/{n}   Naming {c}/{m}/{n}   Complexity {c}/{m}/{n}   Smells {c}/{m}/{n}
-(critical/major/minor)
+1. `# Code Quality Remediation Plan`
+2. `## Audit metadata` — target, revision, date, standards, files scanned, chunks, and declared finding total.
+3. `## Executive summary`
+4. `## Scan coverage` — full file manifest or an unambiguous generated manifest section, plus chunk completion table and per-dimension counts.
+5. `## Finding ledger` — one explicit row per full stable ID with all Step 3 fields.
+6. `## Programme roadmap` — one row per workstream with phase, findings, prerequisites, parallel track, and closure gate.
+7. `## Dependency and relationship register` — duplicate aliases, overlaps, dependencies, conflicts, and dispositions.
+8. `## Workstream plans` — one complete subsection per workstream with every Step 4 field.
+9. `## Coverage matrix` — one explicit row per stable ID with severity, primary workstream, phase, disposition, and acceptance-criterion references.
+10. `## Validation backlog`
+11. `## Accounting` — reconciled totals by severity, dimension, phase, and workstream.
+12. `## Executor readiness` — the gate results below and either `READY` or `NOT READY: <exact failures>`.
 
-Any dimension that could not run: {name it, or omit this line}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+The roadmap, workstream plans, and coverage matrix are independent views and must agree. Do not rely on console text or another report for omitted details.
 
-Complete when the human can see the full stable-ID audit and its reconciled totals.
+Complete when the file is self-contained and all required sections exist in order.
 
-## Step 7: Produce the Phased Remediation Plan
+## 6. Run the executor-readiness gate
 
-If there are two or more findings, invoke `report-remediation-planner` and pass the complete consolidated audit from Step 6 as its report input. Follow that skill as the authority for finding ledger fields, duplicate accounting, workstreams, phase sequencing, acceptance criteria, coverage gates, and output order. Keep the `QA-*` IDs unchanged so every audit finding remains traceable through the plan.
+Before claiming `READY`, check the written file rather than working memory:
 
-If the planner skill cannot be resolved, stop after the audit and tell the human that the review succeeded but the phased plan could not be produced; name the missing skill rather than substituting an ad hoc checklist.
+- declared finding total = explicit ledger row count = explicit coverage-matrix row count;
+- every ID is unique, complete, and appears in exactly one primary workstream;
+- every roadmap workstream has one matching full workstream section and the same phase;
+- every coverage row references existing acceptance criteria in its primary workstream;
+- every workstream has a code boundary, remediation shape, prerequisites, tests, and closure gate;
+- duplicate aliases remain traceable without double-counting implementation scope;
+- phase totals and workstream totals equal the declared finding total;
+- scan coverage proves every target file and every audit dimension was processed;
+- no section says `see above`, uses an ID range, or substitutes a summary for row-level accounting.
 
-If there is exactly one finding, do not invoke the multi-finding planner. Add a single-issue remediation section containing the finding ID, objective, prerequisite, acceptance criterion, and closure check. If there are no findings, state that no remediation plan is needed.
+Repair the artifact and rerun the gate until it passes. If a source limitation prevents repair, mark `NOT READY` and list the exact missing IDs or fields.
 
-Print the plan directly after the audit unless the human requested an output file; in that case, let `report-remediation-planner` apply its output-file behavior. Do not implement fixes, open tickets, or modify production code.
+Complete when every check is recorded as passing in `## Executor readiness`, or the artifact clearly identifies why execution is blocked.
 
-Complete when every audit finding maps to exactly one phased workstream and acceptance criterion, or the zero/single-finding branch has been reported explicitly.
+## 7. Report
+
+Tell the human the output path, finding/workstream/phase counts, readiness status, and any limitations. For zero findings, still write metadata, scan coverage, empty ledger/roadmap/matrix, reconciled zero accounting, and `READY — no execution required`. For one finding, create one workstream and one executable phase rather than using a separate format.
+
+Complete when the human can pass the written file and a phase number directly to `phased-plan-executor` without another planning step.
+
+## Integration with sibling skills
+
+| Counterpart | Hand-off |
+|---|---|
+| `phased-plan-executor` | Executes one numbered phase from this skill's `READY` output file. |
+| `investigate-repo` | Validates uncertain reachability or repository claims before a gated phase runs. |
+| `subagent-dispatch` | Supplies host-specific dispatch mechanics for chunk auditors. |
