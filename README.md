@@ -78,7 +78,7 @@ Skills are reusable workflows and guidance modules. Some are user-invoked top-le
 | `/investigate-repo` | `<question \| markdown \| path-to-markdown>` | Read-only investigation of a repository question or every finding in a Markdown audit, including evidence-backed production-reachability and dead-code checks. |
 | `/iterate` | `[route or all]` | Iterative UI fix loop. Routes through specialist agents, captures, analyses, fixes, and re-verifies one route at a time, raising a single PR. |
 | `/ui-review` | `[route or all]` | Screenshot-driven UX review. Configured via `.claude/ui-review.json`; captures, analyses, fixes, and re-verifies each route. |
-| `/quality-audit` | `[path \| glob \| diff \| (empty)]` | Parallel code quality audit. Checks SOLID violations, naming conventions, cyclomatic/cognitive complexity, and clean-code smells across a path, a diff, or the whole repo. |
+| `/quality-audit` | `[path \| glob \| diff \| (empty)] [output file]` | Parallel code-quality audit that writes a complete, coverage-accounted phased remediation plan ready for direct use by `phased-plan-executor`. |
 | `/retrospective` | `[task name / PR / bug]` | Post-task knowledge extraction. Reconstructs the session, routes reusable learnings to `bugs/`, `docs/`, `CLAUDE.md`, or `~/.claude/CLAUDE.md`, and proposes process improvements. |
 | `/adr-drafter` | `<decision description>` | Draft an Architecture Decision Record following the repo's own ADR conventions or a sensible default house style. |
 | `/test-failure-triager` | `<test output or description>` | Classify failing tests as production bug, test bug, or flake, with a recommended next step. Works across any test framework. |
@@ -91,8 +91,7 @@ Skills are reusable workflows and guidance modules. Some are user-invoked top-le
 | `web-accessibility` | Model-invoked | Builds and reviews web interfaces against WCAG 2.2 Level AA, including semantics, keyboard behaviour, focus, ARIA, forms, touch, and layered verification. |
 | `web-performance` | Model-invoked | Measures and improves browser loading and interaction performance using Core Web Vitals, critical-path diagnosis, asset delivery, and comparable before/after evidence. |
 | `/merge-default-branch` | `[optional remote or default-branch override]` | Merges the remote default branch into the current feature branch, delegates conflicts to `resolving-merge-conflicts`, validates the integration, and pushes. User-invoked only. |
-| `/report-remediation-planner` | `<report path, pasted findings, or report URL>` | Synthesises a multi-finding report into a prioritised, phased remediation plan with common workstreams, dependency order, ownership boundaries, and stable-ID coverage accounting. |
-| `/phased-plan-executor` | `<plan file path> <phase number>` | Executes one phase of an already-written phased plan by dispatching one worktree-isolated subagent per workstream, reconciling conflicts across their reports, then stopping for human approval before any merge or PR. |
+| `/phased-plan-executor` | `<plan file path> <phase number>` | Executes one phase of an executor-ready phased plan, including direct `quality-audit` output, by dispatching one worktree-isolated subagent per workstream, reconciling conflicts, then stopping for human approval before any merge or PR. |
 | `/skill-creator` | `<skill creation or improvement task>` | Creates, revises, evaluates, and improves Claude Code/Devin CLI skills and reusable agent definitions through a draft/test/refine loop. |
 | `/skill-reviewer` | `[skill-name \| path] (empty = whole skills/ library)` | Audits one skill or the whole skills library against skill-creator's own frontmatter, body, and validation rules; reports graded findings and fixes them on request. |
 | `subagent-dispatch` | Model-invoked (before any `Agent` call) | Guides whether and how to dispatch subagents: delegate-vs-inline, the delegation contract, model/effort selection, fan-out sizing, fork vs fresh subagent, and verifier dispatch. |
@@ -236,7 +235,6 @@ When a new skill needs cross-session files:
 │   ├── prose/
 │   ├── prototype/
 │   ├── quality-audit/
-│   ├── report-remediation-planner/
 │   ├── resolving-merge-conflicts/
 │   ├── retrospective/
 │   ├── review-plans/
