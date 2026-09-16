@@ -70,7 +70,8 @@ Run `python <skill-dir>/scripts/audit_session.py next-wave --session <session> -
 - the session and chunk ID plus exact file manifest;
 - the files' contents, not paths alone;
 - the loaded code-quality standard;
-- the requirement to inspect all four dimensions for every assigned file, return per-dimension zero counts, echo back the complete list of files actually inspected, and include `INCOMPLETE: false` when every file is fully audited or `INCOMPLETE: true` when a file must be skipped.
+- the complete `quality-auditor` response format contract (copy the `## Response format` section from the agent definition) — this must be in the worker's prompt, not only in the agent file;
+- the requirement to inspect all four dimensions for every assigned file, return per-dimension zero counts, echo back the complete list of files actually inspected with the exact `Files inspected:` / `- ` format, use only the severities `Critical`, `Major`, `Minor`, and end with the exact marker `INCOMPLETE: false` or `INCOMPLETE: true`.
 
 Write each complete return to a temporary file, then record it before starting another wave. If no parallel mechanism exists, run the passes sequentially. Absence of parallelism changes throughput, not audit completeness.
 
