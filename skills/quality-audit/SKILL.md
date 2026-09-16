@@ -63,23 +63,19 @@ The session harness deterministically groups the sorted manifest with a **hard c
 
 Use the persisted chunk IDs and exact manifests; do not rebuild or renumber chunks in conversational memory.
 
-### 2b. Dispatch auditors
+### 2b. Build worker prompts and dispatch
 
-Run `python <skill-dir>/scripts/audit_session.py next-wave --session <session> --limit 8` and dispatch exactly the returned pending chunks concurrently using the host's native subagent mechanism. Give each pass:
-
-- the session and chunk ID plus exact file manifest;
-- the files' contents, not paths alone;
-- the loaded code-quality standard;
-- the complete `quality-auditor` response format contract (copy the `## Response format` section from the agent definition) — this must be in the worker's prompt, not only in the agent file;
-- the requirement to inspect all four dimensions for every assigned file, return per-dimension zero counts, echo back the complete list of files actually inspected with the exact `Files inspected:` / `- ` format, use only the severities `Critical`, `Major`, `Minor`, and end with the exact marker `INCOMPLETE: false` or `INCOMPLETE: true`.
+1. Run `python <skill-dir>/scripts/audit_session.py next-wave --session <session> --limit 8` to get the active chunks.
+2. For each chunk, materialize a self-contained worker prompt with `python <skill-dir>/scripts/audit_session.py prompt --session <session> --chunk <chunk-id>`. This writes `<session>/prompts/<chunk-id>-prompt.md`, which already contains the full `quality-auditor` instructions, the code-quality standard, and the file contents in the required format.
+3. Dispatch each chunk using the host's native subagent mechanism (e.g. `run_subagent` with `profile: subagent_general`). Set the `task` to the **entire contents** of `<chunk-id>-prompt.md` (read the file first; do not summarize or reframe it). Because the prompt file embeds the exact response contract, do not copy only a snippet of the contract into the dispatch — pass the complete file.
 
 Write each complete return to a temporary file, then record it before starting another wave. If no parallel mechanism exists, run the passes sequentially. Absence of parallelism changes throughput, not audit completeness.
 
 ### 2c. Post-wave reconciliation
 
-For every returned chunk, run `python <skill-dir>/scripts/audit_session.py record --session <session> --chunk <chunk-id> --result <return-file>`. The harness checks the exact ordered file echo, all four dimension summaries, and an explicit `INCOMPLETE: false` or `INCOMPLETE: true` marker; it stores accepted evidence under `results/`, stores rejected evidence under `retries/`, and halves rejected multi-file chunks into new pending child chunks.
+For every returned chunk, run `python <skill-dir>/scripts/audit_session.py record --session <session> --chunk <chunk-id> --result <return-file>`. The harness checks the exact ordered file echo, all four dimension summaries, and an explicit `INCOMPLETE: false` or `INCOMPLETE: true` marker; it stores accepted evidence under `results/`, stores rejected evidence under `retries/`, and halves rejected multi-file chunks into new pending child chunks. A single-file chunk that fails the format contract is requeued once automatically; if it still fails, the session is `blocked`.
 
-After recording the wave, run `python <skill-dir>/scripts/audit_session.py status --session <session>`. Continue requesting and dispatching waves while pending chunks remain. A rejected single-file chunk becomes a `blocked` session because it cannot be split further; report that concrete worker failure rather than calling the incomplete audit a remediation plan.
+After recording the wave, run `python <skill-dir>/scripts/audit_session.py status --session <session>`. Continue requesting and dispatching waves while active chunks remain. If a single-file chunk becomes `failed` (e.g. the worker ignored the prompt contract), reset it for another attempt with `python <skill-dir>/scripts/audit_session.py reset --session <session> --chunk <chunk-id>` after rebuilding its prompt, then dispatch again.
 
 Do not proceed to Step 3 until status is `ready-for-synthesis`. An interruption or context boundary leaves the state resumable: the next invocation reads the session and continues with `next-wave`; it does not regenerate completed work.
 
