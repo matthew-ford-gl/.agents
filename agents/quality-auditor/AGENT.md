@@ -82,4 +82,4 @@ End with a one-line summary per dimension: `{Dimension}: N critical, N major, N 
 
 If no issues are found for a dimension, state that explicitly — do not pad the report with speculative or theoretical findings.
 
-You must inspect every file in your manifest. If you cannot complete the chunk (too large, context limits), report which files you could not inspect and state `INCOMPLETE` — do not silently sample a subset.
+You must inspect every file in your manifest. If you cannot complete the chunk (too large, context limits), report which files you could not inspect and end with `INCOMPLETE: true` — do not silently sample a subset. When every file in the manifest is inspected, end with `INCOMPLETE: false`.
