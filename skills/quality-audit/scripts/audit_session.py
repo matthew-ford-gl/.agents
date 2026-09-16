@@ -10,6 +10,7 @@ from pathlib import Path
 
 MAX_FILES = 15
 MAX_BYTES = 30 * 1024
+MAX_ATTEMPTS = 2
 DIMENSIONS = ("SOLID", "Naming & Clean Code", "Complexity", "Code Smells & Duplication")
 
 
@@ -179,10 +180,27 @@ def command_init(args):
     print(session)
 
 
+def is_active(chunk):
+    if chunk["status"] == "pending":
+        return True
+    return chunk["status"] == "rejected" and chunk["file_count"] == 1 and chunk["attempt"] < MAX_ATTEMPTS
+
+
+def recompute_status(state):
+    active = [chunk for chunk in state["chunks"] if is_active(chunk)]
+    failed = [chunk for chunk in state["chunks"] if chunk["status"] == "failed"]
+    if failed:
+        state["status"] = "blocked"
+    elif not active:
+        state["status"] = "ready-for-synthesis"
+    else:
+        state["status"] = "auditing"
+
+
 def command_next_wave(args):
     session = Path(args.session).expanduser().resolve()
     state = load_json(session / "state.json")
-    pending = [chunk for chunk in state["chunks"] if chunk["status"] == "pending"][: args.limit]
+    pending = [chunk for chunk in state["chunks"] if is_active(chunk)][: args.limit]
     print(json.dumps({"session": str(session), "chunks": pending}, indent=2))
 
 
@@ -211,16 +229,19 @@ def dimension_summaries(text):
     return found
 
 
-def split_rejected(state, chunk):
+def split_rejected(state, chunk, is_incomplete):
     files = chunk["files"]
     if len(files) < 2:
-        chunk["status"] = "failed"
+        if is_incomplete or chunk["attempt"] + 1 >= MAX_ATTEMPTS:
+            chunk["status"] = "failed"
+        else:
+            chunk["attempt"] += 1
         return
     midpoint = (len(files) + 1) // 2
     children = []
     for subset in (files[:midpoint], files[midpoint:]):
         child_id = f"C{state['next_chunk_number']:04d}"
-        state["next_chunk_number"] += 1
+        state['next_chunk_number'] += 1
         children.append(make_chunk(child_id, subset, chunk["attempt"] + 1, chunk["id"]))
     state["chunks"].extend(children)
 
@@ -239,7 +260,8 @@ def command_record(args):
     echoed = inspected_files(text)
     summaries = dimension_summaries(text)
     reasons = []
-    if re.search(r"(?im)^\s*INCOMPLETE\s*:\s*true\s*$", text):
+    is_incomplete = bool(re.search(r"(?im)^\s*INCOMPLETE\s*:\s*true\s*$", text))
+    if is_incomplete:
         reasons.append("auditor reported INCOMPLETE: true")
     if not re.search(r"(?im)^\s*INCOMPLETE\s*:\s*false\s*$", text):
         reasons.append("missing INCOMPLETE: false completion marker")
@@ -256,17 +278,12 @@ def command_record(args):
     if reasons:
         chunk["status"] = "rejected"
         chunk["error"] = "; ".join(reasons)
-        split_rejected(state, chunk)
+        split_rejected(state, chunk, is_incomplete)
     else:
         chunk["status"] = "accepted"
         chunk["error"] = None
     state["updated_at"] = datetime.now(timezone.utc).isoformat()
-    active = [item for item in state["chunks"] if item["status"] == "pending"]
-    failed = [item for item in state["chunks"] if item["status"] == "failed"]
-    if failed:
-        state["status"] = "blocked"
-    elif not active:
-        state["status"] = "ready-for-synthesis"
+    recompute_status(state)
     atomic_json(state_path, state)
     print(json.dumps({"chunk": chunk["id"], "status": chunk["status"], "error": chunk["error"]}, indent=2))
 
@@ -285,6 +302,99 @@ def command_status(args):
         "accepted_files": accepted_files,
         "manifest_files": state["manifest_file_count"],
     }, indent=2))
+
+
+def resolve_agent_md(repo):
+    candidates = [
+        repo / ".devin" / "agents" / "quality-auditor" / "AGENT.md",
+        repo / ".claude" / "agents" / "quality-auditor.md",
+        Path.home() / ".agents" / "agents" / "quality-auditor" / "AGENT.md",
+        Path.home() / ".claude" / "agents" / "quality-auditor.md",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    fallback = Path(__file__).resolve().parents[3] / "agents" / "quality-auditor" / "AGENT.md"
+    if fallback.is_file():
+        return fallback
+    raise ValueError("could not resolve quality-auditor AGENT.md")
+
+
+def command_prompt(args):
+    session = Path(args.session).expanduser().resolve()
+    state = load_json(session / "state.json")
+    chunk = next((item for item in state["chunks"] if item["id"] == args.chunk), None)
+    if not chunk:
+        raise ValueError(f"unknown chunk: {args.chunk}")
+    repo = Path(args.repo).expanduser().resolve() if args.repo else Path(state["repository"])
+    standard = Path(state["standard"]).expanduser().resolve()
+    agent_md = resolve_agent_md(repo)
+    agent_text = agent_md.read_text(encoding="utf-8")
+    standard_text = standard.read_text(encoding="utf-8") if standard.is_file() else ""
+    files = []
+    for entry in chunk["files"]:
+        source = (repo / entry["path"]).resolve()
+        try:
+            content = source.read_text(encoding="utf-8", errors="replace")
+        except OSError as error:
+            raise ValueError(f"cannot read {entry['path']}: {error}") from error
+        files.append({"path": entry["path"], "content": content})
+    parts = [
+        f"# quality-auditor prompt for {chunk['id']}",
+        "",
+        "You are a quality-auditor worker. The instructions below are self-contained.",
+        "Follow the response format exactly. Do not add preamble, headings, or numbering.",
+        "",
+        agent_text,
+        "",
+        "## Code-quality standard",
+        "",
+        standard_text,
+        "",
+        f"## Chunk {chunk['id']} files to inspect",
+        "",
+        "Echo the exact repository-relative paths below in the `Files inspected:` block.",
+    ]
+    for file in files:
+        parts.extend([
+            "",
+            f"### {file['path']}",
+            f"--- begin {file['path']} ---",
+            file["content"],
+            f"--- end {file['path']} ---",
+        ])
+    parts.extend([
+        "",
+        "## Final reminder",
+        "",
+        "Return only the audit result in the exact format above. Start with `Files inspected:`. End with `INCOMPLETE: false` if every file was inspected, or `INCOMPLETE: true` followed by the uninspected file list if not.",
+    ])
+    prompt_dir = session / "prompts"
+    prompt_dir.mkdir(exist_ok=True)
+    prompt_path = prompt_dir / f"{chunk['id']}-prompt.md"
+    prompt_path.write_text("\n".join(parts), encoding="utf-8", newline="\n")
+    print(prompt_path)
+
+
+def command_reset(args):
+    session = Path(args.session).expanduser().resolve()
+    state_path = session / "state.json"
+    state = load_json(state_path)
+    if args.chunk:
+        targets = [item for item in state["chunks"] if item["id"] == args.chunk and item["status"] == "failed"]
+    else:
+        targets = [item for item in state["chunks"] if item["status"] == "failed"]
+    if not targets:
+        print(json.dumps({"reset": [], "status": state["status"]}, indent=2))
+        return
+    for chunk in targets:
+        chunk["status"] = "pending"
+        chunk["attempt"] += 1
+        chunk["error"] = None
+    recompute_status(state)
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
+    atomic_json(state_path, state)
+    print(json.dumps({"reset": [chunk["id"] for chunk in targets], "status": state["status"]}, indent=2))
 
 
 def parser():
@@ -311,6 +421,15 @@ def parser():
     status = commands.add_parser("status")
     status.add_argument("--session", required=True)
     status.set_defaults(handler=command_status)
+    prompt = commands.add_parser("prompt")
+    prompt.add_argument("--session", required=True)
+    prompt.add_argument("--chunk", required=True)
+    prompt.add_argument("--repo")
+    prompt.set_defaults(handler=command_prompt)
+    reset = commands.add_parser("reset")
+    reset.add_argument("--session", required=True)
+    reset.add_argument("--chunk")
+    reset.set_defaults(handler=command_reset)
     return root
 
 
