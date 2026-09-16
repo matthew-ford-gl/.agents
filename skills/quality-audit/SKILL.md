@@ -1,7 +1,7 @@
 ---
 name: quality-audit
 description: "Runs a parallel code-quality audit and writes an executor-ready phased remediation plan with a complete finding ledger, actionable workstreams, dependency gates, and stable-ID coverage accounting. Use when asked to audit code quality, review SOLID/complexity/smells, run a quality pass, or identify and sequence quality improvements across a path, diff, or repository. Not for: architecture design review, security review, PR requirements compliance, or implementing fixes."
-argument-hint: "[path | glob | diff | (empty = whole repo)] [output file]"
+argument-hint: "[path | glob | diff | (empty = whole repo)] [full | screen | dead-code | large-methods | magic-numbers | naming | all] [output file]"
 model: opus
 ---
 
@@ -21,6 +21,24 @@ Audit a target in parallel, consolidate every finding once, and write one self-c
 - If planning cannot be completed because of an actual source or worker failure, preserve the session and report the exact blocker. Do not emit a partial plan as executor-ready.
 
 Complete when the cost, fallback, and non-applicability branches are resolved.
+
+## 0. Intake: choose the audit mode and dimension
+
+Determine the desired depth before resolving the target. The default depends on the user and the resolved chunk count.
+
+1. Parse the second argument if present. Supported modes:
+   - `full` or `all` — the existing four-dimension deep audit for every file.
+   - `screen` — score all files by smell density, then deep-audit only the riskiest set (default for large components).
+   - `dead-code`, `large-methods`, `magic-numbers`, `naming`, `complexity`, `solid` — run a single-dimension screen/deep pass across the target.
+2. If no mode is supplied, use `ask_user_question` to ask. Include the resolved chunk count and a clear warning for `full` when it exceeds ~20 chunks. The options should be:
+   - **Full deep audit** — all dimensions, every file (best for small targets/diffs).
+   - **Screen mode** — score every file, deep-audit the riskiest set (best for large components).
+   - **Single-dimension scan** — pick one rule and surface all offenders across the component.
+3. Record the choice and branch to the matching workflow.
+
+For `screen` and single-dimension modes, the workflow is the same capture/synthesise loop, but the manifest is first filtered or ranked. Use deterministic heuristics to score, then run the `quality-auditor` on the selected files with the dimension(s) in scope. The final report must clearly state the screening rule and coverage of uninspected files.
+
+Complete when the mode and dimension are fixed and the manifest is sized for that mode.
 
 ## 1. Resolve instructions, agent, and target
 
