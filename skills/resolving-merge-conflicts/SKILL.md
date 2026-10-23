@@ -1,6 +1,6 @@
 ---
 name: resolving-merge-conflicts
-description: "Resolve an in-progress Git merge or rebase conflict hunk by hunk from each side's original intent, then verify the integrated result. Use when Git reports unresolved merge or rebase conflicts. Not for: starting a new merge/rebase, or resolving conflicts outside an in-progress Git operation."
+description: "Resolve an in-progress Git merge or rebase conflict hunk by hunk from each side's original intent, then verify the integrated result. Use when Git reports unresolved merge or rebase conflicts, files are 'both modified', unmerged paths exist, or conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) are found in files. Not for: starting a new merge/rebase, or resolving conflicts outside an in-progress Git operation."
 argument-hint: "<optional merge context>"
 model: sonnet  # bounded hunk-by-hunk evidence tracing and verification is procedural judgement, not multi-agent synthesis; sonnet is sufficient
 ---

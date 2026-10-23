@@ -1,8 +1,7 @@
 ---
 name: merge-default-branch
-description: "Merges the remote default branch into the current feature branch, delegates reported conflicts for intent-based resolution, validates the integration, and pushes the current branch. Use when asked to update, sync, or bring main/master into the current branch and push it. Not for: rebasing, merging a pull request, updating the default branch itself, or an already-conflicted merge/rebase."
+description: "Merges the remote default branch into the current feature branch, delegates reported conflicts for intent-based resolution, validates the integration, and pushes the current branch. Use when asked to update, sync, refresh, or bring the current branch up to date with main/master and push it — including phrasings like 'get my branch up to date', 'merge main into my branch', 'sync with main', or 'update my branch'. Not for: rebasing, merging a pull request, updating the default branch itself, or an already-conflicted merge/rebase."
 argument-hint: "<optional remote or default-branch override>"
-disable-model-invocation: true
 ---
 
 # Merge Default Branch
