@@ -6,6 +6,8 @@ argument-hint: "<optional focus for the next session>"
 
 # Session Handoff
 
+If the session is ending entirely rather than continuing elsewhere, run the `retro` skill first — improvement findings belong in the ledger, not the handoff.
+
 Focus for the next session: $ARGUMENTS
 
 1. Resolve the operating system's temporary directory: `[System.IO.Path]::GetTempPath()` or `$env:TEMP` on Windows, and `$TMPDIR` falling back to `/tmp` on macOS/Linux. Save a uniquely named Markdown handoff there, never in the repository.

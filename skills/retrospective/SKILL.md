@@ -12,7 +12,7 @@ Input: `$ARGUMENTS` (optional) — task name, PR URL, bug ID, or any identifier 
 
 Reconstructs what happened from available evidence (git log, PR, discussion files, ROOT-CAUSE.md, DECISION.md, test results), identifies learnings that will help future work, and routes each one to the most specific knowledge file that owns it.
 
-Run this after completing a significant task, fixing a non-trivial bug, or finishing any work that produced surprising findings.
+Run this after completing a significant task, fixing a non-trivial bug, or finishing any work that produced surprising findings. For tooling-level friction findings (skill gaps, missed triggers, agent/model questions), the `retro` skill's session ledger is the better home — route those there and keep this skill for domain learnings.
 
 ---
 
