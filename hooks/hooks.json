@@ -8,6 +8,11 @@
                         "type": "command",
                         "command": "bash --noprofile --norc \"$HOME/.agents/hooks/scripts/send-ai-alert.sh\"",
                         "timeout": 15
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash --noprofile --norc -c \"python \\\"$HOME/.agents/hooks/scripts/session-stats.py\\\" 2>/dev/null || python3 \\\"$HOME/.agents/hooks/scripts/session-stats.py\\\" 2>/dev/null || true\"",
+                        "timeout": 10
                     }
                 ]
             }
