@@ -3,11 +3,19 @@
 When changing `hooks/scripts/`, run from the repository root:
 
 ```sh
-python -m unittest discover -s hooks/scripts -p test_alert_hooks.py -v
 bash -n hooks/scripts/send-ai-alert.sh
+powershell.exe -NoProfile -Command "$null=[System.Management.Automation.PSParser]::Tokenize((Get-Content -Raw 'hooks/scripts/send-ai-alert.ps1'),[ref]$null)"
 ```
 
-The tests use temporary SQLite databases and mock alert delivery and sound. Bash and PowerShell integration cases skip when their executable is unavailable. Keep verification isolated from the real Echo endpoint.
+Then smoke-test the filter path with a simulated event (bogus endpoint and key so nothing real is sent):
+
+```sh
+echo '{"hook_event_name":"SessionEnd","reason":"clear","session_id":"nonexistent"}' | ECHO_ALERT_API_KEY=x ECHO_ALERT_API_BASE=http://127.0.0.1:1 bash hooks/scripts/send-ai-alert.sh
+```
+
+There is no automated test suite for these scripts yet (`test_alert_hooks.py` referenced previously does not exist).
+
+Keep `send-ai-alert.sh` and `send-ai-alert.ps1` behavior in sync and bump `SCRIPT_VERSION`/`$ScriptVersion` in both — the live user-level config `%APPDATA%\devin\config.json` invokes the .ps1, while this repo's `hooks/hooks.json` invokes the .sh. Alerts tag the emitting script + version in the reason field, which is how you tell which one fired.
 
 # Windows shell gotchas (Git Bash / MSYS)
 

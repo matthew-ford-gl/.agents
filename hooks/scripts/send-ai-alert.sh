@@ -10,7 +10,7 @@
 # ── Version ──────────────────────────────────────────────────────────────────
 # Bump this whenever the script's alerting behavior changes, so alerts in
 # flight can be traced back to the version that emitted them.
-SCRIPT_VERSION="1.6.0"
+SCRIPT_VERSION="1.6.2"
 
 # ── Configuration ────────────────────────────────────────────────────────────
 API_BASE="${ECHO_ALERT_API_BASE:-https://echo.uk.hos.accessacloud.com}"
@@ -86,6 +86,14 @@ if [ "$EVENT_NAME" = "Stop" ] && [ "$HAS_PENDING_SUBAGENTS" = "true" ]; then
     exit 0
 fi
 
+# Skip SessionEnd alerts for user-initiated session resets — /new ends the
+# session with reason "clear". The user deliberately ended it, so there's
+# nothing to notify about. Other end reasons (crashes, timeouts, abnormal
+# exits) still alert.
+if [ "$EVENT_NAME" = "SessionEnd" ] && [ "$(json_val "reason" "")" = "clear" ]; then
+    exit 0
+fi
+
 # ── Dedupe identical back-to-back alerts ─────────────────────────────────────
 # Long-running autonomous tasks (e.g. the ship/quality-audit skills) can end
 # their turn more than once with no real progress — same session, same
@@ -99,6 +107,19 @@ if [ -f "$DEDUPE_SCRIPT" ] && [ -n "$PYTHON_BIN" ]; then
     DEDUPE_KEY="${SESSION_ID}|${EVENT_NAME}|${LAST_MESSAGE_FOR_KEY}"
     DEDUPE_RESULT=$($PYTHON_BIN "$DEDUPE_SCRIPT" "$DEDUPE_KEY" 300 2>/dev/null)
     if [ "$DEDUPE_RESULT" = "skip" ]; then
+        exit 0
+    fi
+
+    # Coarse dedupe: same session + same event within 60s, regardless of
+    # last-message content. The same hook event can be delivered to multiple
+    # hook sources (user config AND project hooks.json) and even the same
+    # script twice, each resolving a slightly different context (e.g. one
+    # process reads last_message from sessions.db while another's lookup
+    # fails) -- which produces different exact keys above. This coarse key
+    # collapses that parallel fan-out. A genuinely new alert for the session
+    # more than a minute later still fires.
+    COARSE_RESULT=$($PYTHON_BIN "$DEDUPE_SCRIPT" "${SESSION_ID}|${EVENT_NAME}" 60 2>/dev/null)
+    if [ "$COARSE_RESULT" = "skip" ]; then
         exit 0
     fi
 fi

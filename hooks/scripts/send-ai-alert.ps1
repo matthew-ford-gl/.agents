@@ -11,7 +11,7 @@
 # -- Version ------------------------------------------------------------------------
 # Bump this whenever the script's alerting behavior changes, so alerts in flight
 # can be traced back to the version that emitted them.
-$ScriptVersion = "1.6.0"
+$ScriptVersion = "1.6.2"
 
 # -- Configuration ----------------------------------------------------------------
 $ApiBase = if ($env:ECHO_ALERT_API_BASE) { $env:ECHO_ALERT_API_BASE } else { "https://echo.uk.hos.accessacloud.com" }
@@ -78,6 +78,12 @@ if ($IsSubagent) { exit 0 }
 # pending subagents, since that would mean the session ended abnormally.
 if ($EventName -eq 'Stop' -and $HasPendingSubagents) { exit 0 }
 
+# Skip SessionEnd alerts for user-initiated session resets -- /new ends the
+# session with reason "clear". The user deliberately ended it, so there's
+# nothing to notify about. Other end reasons (crashes, timeouts, abnormal
+# exits) still alert.
+if ($EventName -eq 'SessionEnd' -and (Get-JsonVal $Event 'reason' '') -eq 'clear') { exit 0 }
+
 # -- Dedupe identical back-to-back alerts -------------------------------------------
 # Long-running autonomous tasks (e.g. the ship/quality-audit skills) can end their
 # turn more than once with no real progress -- same session, same event, same last
@@ -92,6 +98,17 @@ if ((Test-Path $DedupeScript) -and (Get-Command python -ErrorAction SilentlyCont
         $DedupeKey = "$SessionId|$EventName|$LastMessageForKey"
         $DedupeResult = python $DedupeScript $DedupeKey 300 2>$null
         if ($DedupeResult -eq 'skip') { exit 0 }
+
+        # Coarse dedupe: same session + same event within 60s, regardless of
+        # last-message content. The same hook event can be delivered to
+        # multiple hook sources (user config AND project hooks.json) and even
+        # the same script twice, each resolving a slightly different context
+        # (e.g. one process reads last_message from sessions.db while
+        # another's lookup fails) -- which produces different exact keys
+        # above. This coarse key collapses that parallel fan-out. A genuinely
+        # new alert for the session more than a minute later still fires.
+        $CoarseResult = python $DedupeScript "$SessionId|$EventName" 60 2>$null
+        if ($CoarseResult -eq 'skip') { exit 0 }
     }
     catch {}
 }
