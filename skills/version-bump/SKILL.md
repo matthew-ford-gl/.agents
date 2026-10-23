@@ -10,7 +10,7 @@ Mechanical chore: find version fields, bump, branch, PR. The judgement is scope 
 
 ## 1. Confirm scope and base
 
-- Which components? Users often name a subset ("sitehub and web only") — bump exactly those, even if more version fields exist.
+- Which components? Users often name a subset ("only X and Y") — bump exactly those, even if more version fields exist.
 - Start from latest default branch unless told otherwise: `git fetch origin && git checkout -b chore/bump-<component>-<version> origin/<default>`.
 - Refuse on a dirty tree unless the user says the changes are unrelated and may ride along.
 
@@ -18,7 +18,7 @@ Mechanical chore: find version fields, bump, branch, PR. The judgement is scope 
 
 Check these, in order of likelihood:
 
-- CI/deploy YAML: `grep -rn "^version:\|version:" .devops/ .azure-pipelines/ .github/` — often one `version:` key per service file.
+- CI/deploy YAML: `grep -rn "version" .devops/ .azure-pipelines/ .github/` — a starting heuristic; tune for quoted keys or `version =` styles as the repo dictates. Often one `version:` key per service file.
 - `*.csproj` / `Directory.Build.props`: `<Version>`, `<VersionPrefix>`, `<AssemblyVersion>`.
 - `package.json`: `"version": "x.y.z"` (note: `npm version` also tags — edit the field directly when the flow is bump-branch-PR).
 - `*.nuspec`, `app.manifest`, Helm `Chart.yaml` (`version:` vs `appVersion:` — ask if both present).
@@ -34,7 +34,8 @@ Report what you found and which you'll change before editing if the set is ambig
 ## 4. Commit, push, PR
 
 - Commit only the version files: `git add <files> && git commit -m "Bump <component> to <version>"`.
-- Push and open the PR using the repo's remote type — `gh pr create` for GitHub; for Azure DevOps use the `create-ado-pr` skill (title like "Bump sitehub/web patch versions").
+- Confirm the changed-file list and target branch with the user before pushing, unless they pre-authorized the full bump-branch-PR flow (e.g. "bump it and PR it").
+- Push and open the PR using the repo's remote type — `gh pr create` for GitHub; for Azure DevOps use the `create-ado-pr` skill (title like "Bump <component> patch versions"). If `create-ado-pr` isn't installed, push the branch and return the compare-PR URL for the user to open manually.
 
 ## Completion
 
