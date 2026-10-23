@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: "Reviews a GitHub or Azure DevOps pull request for requirements compliance, coding standards, and backwards compatibility across upgrades, mixed-version deployments, persisted data, and public contracts, then presents a consolidated PASS/FAIL verdict with a fixes table. Use when given a GitHub or Azure DevOps PR URL and asked to review, gate, or assess it for merge-readiness. Not for: reviewing a local diff or branch with no PR URL (use code-review), single-dimension security-only review (use security-review), or reviewing a plan before any code exists."
+description: "Reviews a GitHub or Azure DevOps pull request for requirements compliance, coding standards, and backwards compatibility across upgrades, mixed-version deployments, persisted data, and public contracts, then presents a consolidated PASS/FAIL verdict with a fixes table. Use when given a GitHub or Azure DevOps PR URL and asked to review, gate, or assess it for merge-readiness. Not for: reviewing a local diff or branch with no PR URL (use code-review), single-dimension security-only review (use security-audit), or reviewing a plan before any code exists."
 argument-hint: "<PR URL (GitHub or Azure DevOps)>"
 model: sonnet  # orchestration/dispatch workload (parsing the PR, fanning out 3 reviewer subagents, consolidating results); the reasoning-heavy work happens in the dispatched agents, so a lighter model here is sufficient
 ---
