@@ -10,7 +10,7 @@
 # ── Version ──────────────────────────────────────────────────────────────────
 # Bump this whenever the script's alerting behavior changes, so alerts in
 # flight can be traced back to the version that emitted them.
-SCRIPT_VERSION="1.6.0"
+SCRIPT_VERSION="1.6.1"
 
 # ── Configuration ────────────────────────────────────────────────────────────
 API_BASE="${ECHO_ALERT_API_BASE:-https://echo.uk.hos.accessacloud.com}"
@@ -83,6 +83,14 @@ fi
 # really "waiting for user input". SessionEnd/Notification events still
 # alert regardless.
 if [ "$EVENT_NAME" = "Stop" ] && [ "$HAS_PENDING_SUBAGENTS" = "true" ]; then
+    exit 0
+fi
+
+# Skip SessionEnd alerts for user-initiated session resets — /new ends the
+# session with reason "clear". The user deliberately ended it, so there's
+# nothing to notify about. Other end reasons (crashes, timeouts, abnormal
+# exits) still alert.
+if [ "$EVENT_NAME" = "SessionEnd" ] && [ "$(json_val "reason" "")" = "clear" ]; then
     exit 0
 fi
 

@@ -11,7 +11,7 @@
 # -- Version ------------------------------------------------------------------------
 # Bump this whenever the script's alerting behavior changes, so alerts in flight
 # can be traced back to the version that emitted them.
-$ScriptVersion = "1.6.0"
+$ScriptVersion = "1.6.1"
 
 # -- Configuration ----------------------------------------------------------------
 $ApiBase = if ($env:ECHO_ALERT_API_BASE) { $env:ECHO_ALERT_API_BASE } else { "https://echo.uk.hos.accessacloud.com" }
@@ -77,6 +77,12 @@ if ($IsSubagent) { exit 0 }
 # really "waiting for user input". SessionEnd events still alert even with
 # pending subagents, since that would mean the session ended abnormally.
 if ($EventName -eq 'Stop' -and $HasPendingSubagents) { exit 0 }
+
+# Skip SessionEnd alerts for user-initiated session resets -- /new ends the
+# session with reason "clear". The user deliberately ended it, so there's
+# nothing to notify about. Other end reasons (crashes, timeouts, abnormal
+# exits) still alert.
+if ($EventName -eq 'SessionEnd' -and (Get-JsonVal $Event 'reason' '') -eq 'clear') { exit 0 }
 
 # -- Dedupe identical back-to-back alerts -------------------------------------------
 # Long-running autonomous tasks (e.g. the ship/quality-audit skills) can end their
