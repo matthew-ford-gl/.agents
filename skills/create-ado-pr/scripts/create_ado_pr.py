@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -33,7 +34,7 @@ def main():
         "--source-branch", args.source,
         "--target-branch", args.target,
         "--title", args.title,
-        "--description", description,
+        "--description", *description.splitlines(),
         "--org", args.org,
         "--project", args.project,
         "--repository", args.repository,
@@ -52,7 +53,10 @@ def main():
         print(json.dumps(preview, indent=2))
         return
 
-    result = subprocess.run(command, text=True, capture_output=True)
+    az = shutil.which("az")
+    if not az:
+        raise SystemExit("az CLI not found on PATH")
+    result = subprocess.run([az, *command[1:]], text=True, capture_output=True)
     if result.returncode:
         sys.stderr.write(result.stderr)
         raise SystemExit(result.returncode)
