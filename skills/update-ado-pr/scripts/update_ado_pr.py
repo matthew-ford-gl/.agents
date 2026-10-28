@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -63,7 +64,7 @@ def main():
 
     results = []
     for index, command in enumerate(commands):
-        result = subprocess.run(command, text=True, capture_output=True)
+        result = subprocess.run([shutil.which(command[0]) or command[0], *command[1:]], text=True, capture_output=True)
         if result.returncode:
             sys.stderr.write(json.dumps({"completed_commands": index, "failed_command": command}) + "\n")
             sys.stderr.write(result.stderr)

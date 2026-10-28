@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -68,7 +69,7 @@ def main():
         print(json.dumps(preview, indent=2))
         return
 
-    result = subprocess.run(create, text=True, capture_output=True)
+    result = subprocess.run([shutil.which(create[0]) or create[0], *create[1:]], text=True, capture_output=True)
     if result.returncode:
         sys.stderr.write(result.stderr)
         raise SystemExit(result.returncode)
@@ -85,7 +86,7 @@ def main():
             "--relation-type", "parent", "--target-id", str(args.parent),
             "--org", args.org, "--output", "json", "--only-show-errors",
         ]
-        relation_result = subprocess.run(relation_command, text=True, capture_output=True)
+        relation_result = subprocess.run([shutil.which(relation_command[0]) or relation_command[0], *relation_command[1:]], text=True, capture_output=True)
         if relation_result.returncode:
             sys.stderr.write(json.dumps({"created_work_item_id": item_id, "failed_command": relation_command}) + "\n")
             sys.stderr.write(relation_result.stderr)
