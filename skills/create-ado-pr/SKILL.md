@@ -1,6 +1,6 @@
 ---
 name: create-ado-pr
-description: "Creates a well-formed Azure DevOps pull request with reviewed title, Markdown description, source/target branches, and repository coordinates by using Azure CLI safely. Use when explicitly asked to create, open, or raise a new PR in Azure DevOps. Not for: GitHub PRs, reviewing or updating an existing PR, pushing branches, completing or merging PRs."
+description: "Creates a well-formed Azure DevOps pull request with reviewed title, Markdown description, source/target branches, and repository coordinates by using Azure CLI safely. Use when explicitly asked to create, open, or raise a new PR in Azure DevOps. Pushes the source branch (plain push) if needed. Not for: GitHub PRs, reviewing or updating an existing PR, force-pushing, completing or merging PRs."
 argument-hint: "[source branch] [target branch] [optional title/work items]"
 model: swe
 ---
@@ -9,14 +9,14 @@ model: swe
 
 Task: `$ARGUMENTS`
 
-Invocation authorizes creating one Azure DevOps pull request after its content and coordinates have been shown to the user. It does not authorize pushing, rewriting history, bypassing policies, enabling auto-complete, completing the PR, or creating a duplicate.
+Invocation authorizes creating one Azure DevOps pull request after its content and coordinates have been shown to the user. It also authorizes a plain `git push` (never force) of the source branch when it has no remote ref or is only ahead of it. It does not authorize force-pushing, rewriting history, bypassing policies, enabling auto-complete, completing the PR, or creating a duplicate.
 
 ## Phase 1: Establish repository state
 
 1. Read repository instructions (`AGENTS.md`, `CLAUDE.md`, and applicable linked context).
 2. Run `git status --short --branch`, `git remote get-url origin`, `git branch --show-current`, and `git log --oneline --decorate -10`.
 3. Confirm the origin is Azure DevOps and resolve the source branch from `$ARGUMENTS` or the current branch. Resolve the target from `$ARGUMENTS`, repository instructions, or the remote default branch; do not assume `main` when it can be inspected.
-4. Verify the source differs from the target and has a remote ref. If it is not pushed, stop and ask whether to push it; do not push as part of this skill.
+4. Verify the source differs from the target and has a remote ref. If it is not pushed or is ahead of its remote ref, run a plain `git push -u origin <source>` (no force). Stop and ask only if the remote has diverged.
 5. Resolve organization, project, and repository from the origin URL. Use `az devops configure --list` only to fill missing values, and ask for any value that remains ambiguous.
 
 Complete when organization URL, project, repository, source branch, and target branch are explicit and the source exists remotely.
@@ -63,6 +63,6 @@ Complete when Azure CLI returns a created PR object, or a specific blocker has b
 
 ## Phase 5: Verify and report
 
-From the creation response, report the PR ID, title, source and target, repository, and web URL. Query that PR once with `az repos pr show` and verify those fields match the preview. Remove the temporary description file created by this invocation.
+From the creation response (the wrapper also prints `PR_ID=<n>` to stderr), report the PR ID, title, source and target, repository, and web URL. Query that PR once with `az repos pr show` and verify those fields match the preview. Remove the temporary description file created by this invocation.
 
 Complete when the created PR is verified against the preview and its ID and URL have been reported.

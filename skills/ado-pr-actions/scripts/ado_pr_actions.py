@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -137,7 +138,7 @@ def main():
         return
 
     try:
-        result = subprocess.run(command, text=True, capture_output=True)
+        result = subprocess.run([shutil.which(command[0]) or command[0], *command[1:]], text=True, capture_output=True)
         if result.returncode:
             sys.stderr.write(result.stderr)
             raise SystemExit(result.returncode)

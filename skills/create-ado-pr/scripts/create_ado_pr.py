@@ -61,6 +61,11 @@ def main():
         sys.stderr.write(result.stderr)
         raise SystemExit(result.returncode)
     print(result.stdout)
+    try:
+        pr = json.loads(result.stdout)
+        print(f"PR_ID={pr['pullRequestId']}", file=sys.stderr)
+    except (ValueError, KeyError, TypeError):
+        pass
 
 
 if __name__ == "__main__":
