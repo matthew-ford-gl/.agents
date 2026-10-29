@@ -1,6 +1,6 @@
 ---
 name: token-savers
-description: Explains the RTK and Caveman token savers, then installs only their local-only parts on Windows, Linux or macOS after the user approves. Use when asked about saving tokens, cutting agent cost or context, "what is RTK", "what is caveman", or to install, check or remove RTK or Caveman. Not for: Caveman Cloud, adaptive model routing, rtk-proxy, building Caveman middleware into an app, or tuning prompts (use prompt-craft).
+description: "Explains the RTK and Caveman token savers, then installs only their local-only parts on Windows, Linux or macOS after the user approves. Use when asked about saving tokens, cutting agent cost or context, "what is RTK", "what is caveman", or to install, check or remove RTK or Caveman. Not for: Caveman Cloud, adaptive model routing, rtk-proxy, building Caveman middleware into an app, or tuning prompts (use prompt-craft)."
 argument-hint: "[explain | install | status | uninstall]"
 ---
 

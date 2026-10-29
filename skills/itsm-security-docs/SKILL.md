@@ -1,6 +1,6 @@
 ---
 name: itsm-security-docs
-description: Drafts and reviews operational and information-security process documents (incident, major incident, cyber incident response, problem, change, escalation, on-call, post-incident review, BCP/DR, runbooks, playbooks, policies, SOPs) against ISO 27001, ISO 27701 and ITIL 4 good practice, in plain, usable prose. Use when asked to write, draft, improve, review, audit, gap-check or sanity-check an incident management process, cyber incident response plan, escalation matrix, severity model, runbook or similar governance document. Not for: architecture decision records (use adr-drafter), code or API docs, prompt or skill files (use writing-for-agents), or formal certification audits and legal advice.
+description: "Drafts and reviews operational and information-security process documents (incident, major incident, cyber incident response, problem, change, escalation, on-call, post-incident review, BCP/DR, runbooks, playbooks, policies, SOPs) against ISO 27001, ISO 27701 and ITIL 4 good practice, in plain, usable prose. Use when asked to write, draft, improve, review, audit, gap-check or sanity-check an incident management process, cyber incident response plan, escalation matrix, severity model, runbook or similar governance document. Not for: architecture decision records (use adr-drafter), code or API docs, prompt or skill files (use writing-for-agents), or formal certification audits and legal advice."
 argument-hint: "<draft|review> <doc type> [path or context]"
 ---
 
