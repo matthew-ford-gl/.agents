@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -56,7 +57,16 @@ def main():
     az = shutil.which("az")
     if not az:
         raise SystemExit("az CLI not found on PATH")
-    result = subprocess.run([az, *command[1:]], text=True, capture_output=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        desc_file, title_file = Path(tmp, "description.md"), Path(tmp, "title.txt")
+        desc_file.write_text(description, encoding="utf-8")
+        title_file.write_text(args.title, encoding="utf-8")
+        run = list(command)
+        run[run.index("--title") + 1] = f"@{title_file}"
+        i = run.index("--description")
+        j = next(k for k in range(i + 1, len(run)) if run[k].startswith("--"))
+        run[i + 1:j] = [f"@{desc_file}"]
+        result = subprocess.run([az, *run[1:]], text=True, capture_output=True)
     if result.returncode:
         sys.stderr.write(result.stderr)
         raise SystemExit(result.returncode)
