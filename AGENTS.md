@@ -23,3 +23,4 @@ Keep `send-ai-alert.sh` and `send-ai-alert.ps1` behavior in sync and bump `SCRIP
 - In a linked worktree, `.git` is a file (`gitdir: ...`), not a directory — `cat .git` to find the real git dir; don't `ls .git/` expecting objects/refs.
 - To free a port: `netstat -ano | grep :<port>` for the PID, then `taskkill //PID <pid> //F` (double slashes in Git Bash).
 - Prefer the `exec` tool's `workdir` parameter over prefixing every command with `cd`.
+- Git Bash `/tmp` and `mktemp` paths are invisible to Windows python/node; use `D:/` or `$TEMP` via `cygpath -w`.
