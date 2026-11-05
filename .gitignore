@@ -3,7 +3,6 @@
 
 # EXCEPT THESE FILES AND FOLDERS
 !.gitignore
-!/azure-skills.txt
 !/*.md
 !/*.ps1
 !/*.sh
@@ -15,33 +14,3 @@
 !hooks/**
 session-findings.md
 __pycache__/
-
-# Azure skills installed from microsoft/azure-skills by the install scripts (see azure-skills.txt)
-skills/airunway-aks-setup/
-skills/appinsights-instrumentation/
-skills/azure-ai/
-skills/azure-aigateway/
-skills/azure-app-onboard/
-skills/azure-app-onboard-prereq/
-skills/azure-cloud-migrate/
-skills/azure-compliance/
-skills/azure-compute/
-skills/azure-deploy/
-skills/azure-diagnostics/
-skills/azure-enterprise-infra-planner/
-skills/azure-kubernetes/
-skills/azure-kusto/
-skills/azure-messaging/
-skills/azure-prepare/
-skills/azure-quotas/
-skills/azure-reliability/
-skills/azure-resource-lookup/
-skills/azure-resource-visualizer/
-skills/azure-storage/
-skills/azure-upgrade/
-skills/azure-validate/
-skills/discover-azure-skills/
-skills/entra-agent-id/
-skills/entra-app-registration/
-skills/microsoft-foundry/
-skills/python-appservice-deploy/

@@ -53,21 +53,20 @@ install_skill_dependencies() {
 }
 
 install_azure_skills() {
-    local names_file="$SCRIPT_DIR/azure-skills.txt"
-    local missing=() name
-    [[ -f "$names_file" ]] || return 0
-    while IFS= read -r name || [[ -n "$name" ]]; do
-        name=${name%$'\r'}
-        [[ -z "$name" || "$name" == \#* ]] && continue
-        [[ -f "$SKILLS_SOURCE/$name/SKILL.md" ]] || missing+=("$name")
-    done < "$names_file"
-    [[ ${#missing[@]} -eq 0 ]] && return 0
+    local lock_file="$SCRIPT_DIR/.skill-lock.json" python_cmd
     if ! command -v npx >/dev/null 2>&1; then
         echo "npx (Node.js) is required to install Azure skills from microsoft/azure-skills." >&2
         return 1
     fi
-    echo "Installing Azure skills: ${missing[*]}"
-    npx --yes skills add microsoft/azure-skills -g -y -a universal -s "${missing[@]}"
+    npx --yes skills add microsoft/azure-skills -g -y -a universal -s '*'
+    [[ -f "$lock_file" ]] || return 0
+    python_cmd=$(command -v python3 || command -v python)
+    "$python_cmd" - "$lock_file" "$SKILLS_SOURCE/.gitignore" <<'PY'
+import json, sys
+lock, out = sys.argv[1:3]
+names = sorted(n for n, s in json.load(open(lock))["skills"].items() if s.get("source") == "microsoft/azure-skills")
+open(out, "w", newline="\n").write("\n".join(["/.gitignore"] + [f"/{n}/" for n in names]) + "\n")
+PY
 }
 
 render_claude_definition() {
