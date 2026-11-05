@@ -154,6 +154,24 @@ function Install-Skills {
     }
 }
 
+function Install-AzureSkills {
+    $namesFile = Join-Path $PSScriptRoot 'azure-skills.txt'
+    if (-not (Test-Path $namesFile)) { return }
+
+    $missing = @(Get-Content $namesFile | ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -and -not $_.StartsWith('#') } |
+        Where-Object { -not (Test-Path (Join-Path $canonicalSkillsRoot "$_\SKILL.md")) })
+    if ($missing.Count -eq 0) { return }
+
+    $npx = Get-Command npx -ErrorAction SilentlyContinue
+    if (-not $npx) {
+        throw 'npx (Node.js) is required to install Azure skills from microsoft/azure-skills.'
+    }
+    Write-Host "Installing Azure skills: $($missing -join ', ')"
+    & $npx.Source --yes skills add microsoft/azure-skills -g -y -a universal -s @missing
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to install Azure skills.' }
+}
+
 function Install-Hooks {
     if (-not (Test-Path $canonicalHooksFile)) { return }
     if (-not (Test-Path $claudeRoot)) { return }
@@ -201,6 +219,7 @@ if (-not (Test-Path $devinRoot)) {
 }
 
 Install-SkillDependencies
+Install-AzureSkills
 Install-Agents
 Install-Skills
 Install-Hooks

@@ -52,6 +52,24 @@ install_skill_dependencies() {
     "$python_cmd" -m playwright install chromium
 }
 
+install_azure_skills() {
+    local names_file="$SCRIPT_DIR/azure-skills.txt"
+    local missing=() name
+    [[ -f "$names_file" ]] || return 0
+    while IFS= read -r name || [[ -n "$name" ]]; do
+        name=${name%$'\r'}
+        [[ -z "$name" || "$name" == \#* ]] && continue
+        [[ -f "$SKILLS_SOURCE/$name/SKILL.md" ]] || missing+=("$name")
+    done < "$names_file"
+    [[ ${#missing[@]} -eq 0 ]] && return 0
+    if ! command -v npx >/dev/null 2>&1; then
+        echo "npx (Node.js) is required to install Azure skills from microsoft/azure-skills." >&2
+        return 1
+    fi
+    echo "Installing Azure skills: ${missing[*]}"
+    npx --yes skills add microsoft/azure-skills -g -y -a universal -s "${missing[@]}"
+}
+
 render_claude_definition() {
     local source_file=$1
     local destination_file=$2
@@ -100,6 +118,7 @@ render_claude_definition() {
 
 echo "Installing agents and skills from $SCRIPT_DIR into $TARGET_DIR"
 install_skill_dependencies
+install_azure_skills
 
 if [[ "$WITH_CLAUDE" == true ]]; then
     CLAUDE_AGENTS_DIR="$TARGET_DIR/.claude/agents"
