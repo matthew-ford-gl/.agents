@@ -29,10 +29,7 @@ def route_params(project, repository_id, pr_id, thread_id=None):
     }
     if thread_id is not None:
         params["threadId"] = thread_id
-    flat = []
-    for k, v in params.items():
-        flat.extend(["--route-parameters", f"{k}={v}"])
-    return flat
+    return ["--route-parameters", *(f"{k}={v}" for k, v in params.items())]
 
 
 def az(args_list):
