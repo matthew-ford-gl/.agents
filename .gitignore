@@ -13,3 +13,4 @@
 !hooks/
 !hooks/**
 session-findings.md
+__pycache__/

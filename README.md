@@ -3,6 +3,7 @@
 A central repository of reusable agent definitions, command skills, and lifecycle hooks for Claude Code and Devin CLI. This repo is the canonical source. Devin reads `.agents/` directly; the install scripts render Claude-specific definitions, link Devin definitions where needed, and link shared hooks into the directories where each CLI expects them.
 
 - `install-windows.ps1` / `install-mac.sh` / `install-wsl.sh` — renders Claude agents and skills with compatible models, creates Devin and hook symlinks where needed, and removes stale Devin copies. Skips any component whose source does not exist.
+  The scripts also run `npx skills add microsoft/azure-skills -s '*'` (requires Node.js) to install every skill from that repo into `skills/`, and write a self-ignored `skills/.gitignore` listing them (read from `.skill-lock.json`) so they stay untracked.
 - `uninstall-windows.ps1` / `uninstall-mac.sh` / `uninstall-wsl.sh` — removes the artifacts created by the install script.
 
 ---
