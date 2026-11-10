@@ -65,4 +65,6 @@ Complete when Azure CLI returns a created PR object, or a specific blocker has b
 
 From the creation response (the wrapper also prints `PR_ID=<n>` to stderr), report the PR ID, title, source and target, repository, and web URL. Query that PR once with `az repos pr show` and verify those fields match the preview. Remove the temporary description file created by this invocation.
 
-Complete when the created PR is verified against the preview and its ID and URL have been reported.
+The final line of the final message must be the full PR URL (`https://dev.azure.com/<org>/<project>/_git/<repo>/pullrequest/<id>`) alone on its own line: no bullet, label, bold, backticks, quotes, angle brackets, or trailing punctuation, and nothing after it. Build it from the org URL, project, repository, and PR ID if the response lacks a usable `webUrl` (the response's `url` field is an API URL and must not be used). Leave a blank line before it. Print it even when the details above were already shown.
+
+Complete when the created PR is verified against the preview and its ID and URL have been reported, with the bare URL as the last line.
