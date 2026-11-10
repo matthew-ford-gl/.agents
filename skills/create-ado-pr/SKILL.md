@@ -31,7 +31,9 @@ az repos pr list --org <org-url> --project <project> --repository <repository> -
 
 If a matching PR exists, stop and report its ID and URL. Do not create a duplicate.
 
-Complete when no active matching PR exists, or the existing PR has been reported and execution has stopped.
+Then check whether the PR could complete before follow-up work lands. Query `az repos policy list --org <org-url> --project <project> --repository-id <repo-id> --branch <target> --output json` and check the repo's auto-complete settings. If the target branch has no blocking policies (no required reviewers, no build validation), warn the user that the PR can be completed immediately, and confirm before creating it when more commits are still expected. Do not enable auto-complete or alter policies.
+
+Complete when no active matching PR exists, or the existing PR has been reported and execution has stopped, and any no-policy warning has been surfaced.
 
 ## Phase 3: Build the PR content
 

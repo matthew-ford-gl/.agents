@@ -18,6 +18,9 @@ for decisions that change the accepted mandate.
 3. Scan `.context/index.md` when present and load matching project guidance.
 4. Inspect the task's likely code boundaries, contracts, persistence, deployment units, and recent
    history. Do not perform full implementation analysis merely to classify the route.
+5. When the task spans several repositories or applies one config, rule, or script across them,
+   inspect each target repo's real layout (pipeline files, triggers, existing config) before
+   designing the shared solution. Do not assume the targets share one structure.
 
 Complete when the likely scope and every strategic-routing condition below have an evidence-backed
 true or false result.
