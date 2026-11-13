@@ -22,5 +22,6 @@ Keep `send-ai-alert.sh` and `send-ai-alert.ps1` behavior in sync and bump `SCRIP
 - MSYS rewrites arguments that look like POSIX paths. `git show origin/main:.devops/foo.yaml` and similar `rev:path` args can get mangled — prefix with `MSYS_NO_PATHCONV=1` when a `git show`/`git checkout <rev> -- <path>`-style command unexpectedly fails.
 - In a linked worktree, `.git` is a file (`gitdir: ...`), not a directory — `cat .git` to find the real git dir; don't `ls .git/` expecting objects/refs.
 - To free a port: `netstat -ano | grep :<port>` for the PID, then `taskkill //PID <pid> //F` (double slashes in Git Bash).
+- Git Bash `/tmp` and `mktemp` paths are MSYS-virtual: Windows-native `python`, `node`, `az` and `tar -C` cannot see them. Put temp files under `$TEMP` (pass `$(cygpath -w "$f")` to native tools) or a `D:/` path, and prefer `git worktree add` over `git archive | tar`.
 - Prefer the `exec` tool's `workdir` parameter over prefixing every command with `cd`.
 - Git Bash `/tmp` and `mktemp` paths are invisible to Windows python/node; use `D:/` or `$TEMP` via `cygpath -w`.
